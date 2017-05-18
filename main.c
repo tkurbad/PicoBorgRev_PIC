@@ -5,10 +5,10 @@
 
 
 //To compile:
-//sdcc -mpic14 -p16f887 blink.c
+//sdcc -mpic14 -p16f1824 --use-non-free main.c
  
 //To program the chip using pk2cmd:
-//pk2cmd -M -PPIC16f887 -Fblink.hex
+//pk2cmd -M -PPIC16f1824 -Fmain.hex
 
 /* Avoid polluting the global namespace with aliases for each pin. */
 #define NO_BIT_DEFINES
@@ -16,12 +16,11 @@
 // PicoBorg Reverse uses a PIC16F1824 for I2C communication
 #include "pic14/pic16regs.h"
 #include "pic14/pic16f1824.h"
-//#include <stdbool.h>        /* For true/false definition */
 
 #include "picoborgrev.h"
 
 //Set the configuration words:
-__code uint16_t __at (_CONFIG1) configWord1 = (
+__code unsigned short __at (_CONFIG1) configWord1 = (
     _FOSC_INTOSC &
     _WDTE_OFF &
     _PWRTE_ON &
@@ -34,7 +33,7 @@ __code uint16_t __at (_CONFIG1) configWord1 = (
     _FCMEN_ON
     );
 
-__code uint16_t __at (_CONFIG2) configWord2 = (
+__code unsigned short __at (_CONFIG2) configWord2 = (
     _WRT_OFF &
     _PLLEN_ON &
     _STVREN_ON &
@@ -53,35 +52,23 @@ void ConfigureOscillator(void) {
     OSCCONbits.SPLLEN = 1;	    // Enable the 4x PLL (overriden in CONFIG2 by PLLEN = ON)
 }
 
-void Delay_ms(uint16_t ms) {
+void Delay_ms(unsigned short ms) {
     int u;
     while (ms--) {
         for(u = 0; u < LOOPS_PER_MS; u++) {
-            __asm nop __endasm;
+            Nop();
         }
     }
 }
 
-/******************************************************************************/
-/* Private Prototypes                                                         */
-/******************************************************************************/
-void LedTimingTest(void);
-void MotorTest(void);
-void MotorTestPwm(void);
-void MotorTestPwm2(void);
 
 /******************************************************************************/
 /* User Global Variable Declaration                                           */
 /******************************************************************************/
 
-#define SEQ_DELAY_MS		(5000)
-#define PWM_SEQ_DELAY_MS	(50)
-#define PWM2_SEQ_DELAY_MS	(100)
-#define PWM2_FULL_DELAY_MS	(500)
-
-uint16_t i2cSend[I2C_MAX_LEN] = {0};
-uint16_t i2cRecv[I2C_MAX_LEN] = {0};
-uint8_t i2cByte = 0;
+unsigned short i2cSend[I2C_MAX_LEN] = {0};
+unsigned short i2cRecv[I2C_MAX_LEN] = {0};
+unsigned char i2cByte = 0;
 bool epoTripped = false;
 bool epoIgnored = false;
 char junk = 0x00;
@@ -208,7 +195,7 @@ void InitApp(void) {
 	EECON1bits.EEPGD = 0;
 	EECON1bits.CFGS = 0;
 	EECON1bits.RD = 1;
-	value = EEDATL;
+	value = EEDAT;
 	// Check against limits before setting, if out of range keep with the default
 	if ((value > 0x02) && (value < 0x78)) {
 		SSP1ADD = value << 1;
@@ -298,6 +285,7 @@ void SetEncoderMode(bool enabled) {
 	}
 }
 
+/*
 void MoveMotorA(bool reverse, int count) {
 	// Check we are in encoder mode before starting
 	if (!encMode) {
@@ -329,6 +317,7 @@ void MoveMotorB(bool reverse, int count) {
 	// Set the moving flag
 	movingB = true;
 }
+*/
 
 void ProcessI2C(int len) {
 	int i;
@@ -377,7 +366,7 @@ void ProcessI2C(int len) {
 			SetMotorA(true, (int)i2cRecv[2]);
 			echo = true; len = 3;
 			break;
-		case COMMAND_GET_A:
+        case COMMAND_GET_A:
 			i2cSend[0] = COMMAND_GET_A;
 			if (PORTCbits.RC2 == 0) {
 				i2cSend[1] = COMMAND_VALUE_FWD;
@@ -496,6 +485,7 @@ void ProcessI2C(int len) {
 				i2cSend[1] = COMMAND_VALUE_OFF;
 			}
 			break;
+        /*
 		case COMMAND_MOVE_A_FWD:
 			if (len < 4) break;
 			MoveMotorA(false, ((int)i2cRecv[2] << 8) + (int)i2cRecv[3]);
@@ -528,6 +518,7 @@ void ProcessI2C(int len) {
 			MoveMotorB(true, ((int)i2cRecv[2] << 8) + (int)i2cRecv[3]);
 			echo = true; len = 4;
 			break;
+        */
 		case COMMAND_GET_ENC_MOVING:
 			i2cSend[0] = COMMAND_GET_ENC_MOVING;
 			if (movingA || movingB) {
@@ -573,7 +564,7 @@ void ProcessI2C(int len) {
 			EECON1bits.WREN = 0;
 			echo = true; len = 3;
 			break;
-		default:
+        default:
 			// Do nothing
 			break;
 	}
@@ -592,20 +583,11 @@ void ProcessI2C(int len) {
 /******************************************************************************/
 
 void main(void) {
-	int i;
-
 	// Configure the oscillator for the device
 	ConfigureOscillator();
 
 	// Initialize I/O and Peripherals for application
 	InitApp();
-
-	// Test sequences
-	LATAbits.LATA4 = 1;		// LED Off
-	//LedTimingTest();
-	//MotorTest();
-	//MotorTestPwm();
-	//MotorTestPwm2();
 
 	// Brief LED pulse
 	LATAbits.LATA4 = 0;		// LED On
@@ -667,273 +649,5 @@ void main(void) {
 
 		// Kick the watchdog
 		ClrWdt();
-	}
-}
-
-void LedTimingTest(void) {
-	// Pulse LED at a 1 second interval
-	while (1) {
-		Delay_ms(500);
-		ClrWdt();
-		LATAbits.LATA4 = 1;		// LED Off
-		Delay_ms(500);
-		ClrWdt();
-		LATAbits.LATA4 = 0;		// LED On
-	}
-}
-
-void MotorTest(void) {
-	// Run the two motors in sequence (no PWM)
-	CCP1CONbits.CCP1M = 0b0000;	// PWM 1 disabled
-	CCP2CONbits.CCP2M = 0b0000;	// PWM 2 disabled
-	while (1) {
-		// All off
-		ClrWdt();
-		LATAbits.LATA4 = 0;		// LED On
-		LATCbits.LATC3 = 0;		// Motor A:1 Off
-		LATCbits.LATC2 = 0;		// Motor A:2 Off
-		LATCbits.LATC5 = 0;		// Motor B:1 Off
-		LATCbits.LATC4 = 0;		// Motor B:2 Off
-		Delay_ms(SEQ_DELAY_MS);
-		// A forward
-		ClrWdt();
-		LATAbits.LATA4 = 1;		// LED Off
-		LATCbits.LATC3 = 1;		// Motor A:1 On
-		LATCbits.LATC2 = 0;		// Motor A:2 Off
-		LATCbits.LATC5 = 0;		// Motor B:1 Off
-		LATCbits.LATC4 = 0;		// Motor B:2 Off
-		Delay_ms(SEQ_DELAY_MS);
-		// A reverse
-		ClrWdt();
-		LATAbits.LATA4 = 1;		// LED Off
-		LATCbits.LATC3 = 0;		// Motor A:1 Off
-		LATCbits.LATC2 = 1;		// Motor A:2 On
-		LATCbits.LATC5 = 0;		// Motor B:1 Off
-		LATCbits.LATC4 = 0;		// Motor B:2 Off
-		Delay_ms(SEQ_DELAY_MS);
-		// B forward
-		ClrWdt();
-		LATAbits.LATA4 = 1;		// LED Off
-		LATCbits.LATC3 = 0;		// Motor A:1 Off
-		LATCbits.LATC2 = 0;		// Motor A:2 Off
-		LATCbits.LATC5 = 1;		// Motor B:1 On
-		LATCbits.LATC4 = 0;		// Motor B:2 Off
-		Delay_ms(SEQ_DELAY_MS);
-		// B reverse
-		ClrWdt();
-		LATAbits.LATA4 = 1;		// LED Off
-		LATCbits.LATC3 = 0;		// Motor A:1 Off
-		LATCbits.LATC2 = 0;		// Motor A:2 Off
-		LATCbits.LATC5 = 0;		// Motor B:1 Off
-		LATCbits.LATC4 = 1;		// Motor B:2 On
-		Delay_ms(SEQ_DELAY_MS);
-		// A+B forward
-		ClrWdt();
-		LATAbits.LATA4 = 1;		// LED Off
-		LATCbits.LATC3 = 1;		// Motor A:1 On
-		LATCbits.LATC2 = 0;		// Motor A:2 Off
-		LATCbits.LATC5 = 1;		// Motor B:1 On
-		LATCbits.LATC4 = 0;		// Motor B:2 Off
-		Delay_ms(SEQ_DELAY_MS);
-		// A+B reverse
-		ClrWdt();
-		LATAbits.LATA4 = 1;		// LED Off
-		LATCbits.LATC3 = 0;		// Motor A:1 Off
-		LATCbits.LATC2 = 1;		// Motor A:2 On
-		LATCbits.LATC5 = 0;		// Motor B:1 Off
-		LATCbits.LATC4 = 1;		// Motor B:2 On
-		Delay_ms(SEQ_DELAY_MS);
-		// A-B forward
-		ClrWdt();
-		LATAbits.LATA4 = 1;		// LED Off
-		LATCbits.LATC3 = 1;		// Motor A:1 On
-		LATCbits.LATC2 = 0;		// Motor A:2 Off
-		LATCbits.LATC5 = 0;		// Motor B:1 Off
-		LATCbits.LATC4 = 1;		// Motor B:2 On
-		Delay_ms(SEQ_DELAY_MS);
-		// A-B reverse
-		ClrWdt();
-		LATAbits.LATA4 = 1;		// LED Off
-		LATCbits.LATC3 = 0;		// Motor A:1 Off
-		LATCbits.LATC2 = 1;		// Motor A:2 On
-		LATCbits.LATC5 = 1;		// Motor B:1 On
-		LATCbits.LATC4 = 0;		// Motor B:2 Off
-		Delay_ms(SEQ_DELAY_MS);
-
-		ClrWdt();
-	}
-}
-
-void MotorTestPwm(void) {
-	// Run the two motors in sequence (PWM)
-	int i;
-	int j;
-	bool aOn;
-	bool bOn;
-	bool aReverse;
-	bool bReverse;
-	while (1) {
-		for (i = 0; i < 9; ++i) {
-			switch (i) {
-				case 0: // All off
-					LATAbits.LATA4 = 0;		// LED On
-					aOn = false;
-					bOn = false;
-					aReverse = false;
-					bReverse = false;
-					break;
-				case 1: // A forward
-					LATAbits.LATA4 = 1;		// LED Off
-					aOn = true;
-					bOn = false;
-					aReverse = false;
-					bReverse = false;
-					break;
-				case 2: // A reverse
-					LATAbits.LATA4 = 1;		// LED Off
-					aOn = true;
-					bOn = false;
-					aReverse = true;
-					bReverse = false;
-					break;
-				case 3: // B forward
-					LATAbits.LATA4 = 1;		// LED Off
-					aOn = false;
-					bOn = true;
-					aReverse = false;
-					bReverse = false;
-					break;
-				case 4: // B reverse
-					LATAbits.LATA4 = 1;		// LED Off
-					aOn = false;
-					bOn = true;
-					aReverse = false;
-					bReverse = true;
-					break;
-				case 5: // A+B forward
-					LATAbits.LATA4 = 1;		// LED Off
-					aOn = true;
-					bOn = true;
-					aReverse = false;
-					bReverse = false;
-					break;
-				case 6: // A+B reverse
-					LATAbits.LATA4 = 1;		// LED Off
-					aOn = true;
-					bOn = true;
-					aReverse = true;
-					bReverse = true;
-					break;
-				case 7: // A-B forward
-					LATAbits.LATA4 = 1;		// LED Off
-					aOn = true;
-					bOn = true;
-					aReverse = false;
-					bReverse = true;
-					break;
-				case 8: //A-B reverse
-					LATAbits.LATA4 = 1;		// LED Off
-					aOn = true;
-					bOn = true;
-					aReverse = true;
-					bReverse = false;
-					break;
-				default:
-					LATAbits.LATA4 = 1;		// LED Off
-					aOn = false;
-					bOn = false;
-					aReverse = false;
-					bReverse = false;
-					break;
-			}
-			for (j = 1; j <= PWM_MAX; ++j) {
-				if (j == 250) LATAbits.LATA4 = 0;		// LED On
-				// Set motor A
-				if (aOn) {
-					SetMotorA(aReverse, j);
-				} else {
-					SetMotorA(aReverse, 0);
-				}
-				// Set motor B
-				if (bOn) {
-					SetMotorB(bReverse, j);
-				} else {
-					SetMotorB(bReverse, 0);
-				}
-				// Wait
-				Delay_ms(PWM_SEQ_DELAY_MS);
-			}
-		}
-	}
-}
-
-void MotorTestPwm2(void) {
-	// Run the two motors in sequence (PWM)
-	int i;
-	int j;
-	bool aOn;
-	bool bOn;
-	bool aReverse;
-	bool bReverse;
-	while (1) {
-		for (i = 0; i < 2; ++i) {
-			switch (i) {
-				case 0: // A+B forward
-					aOn = true;
-					bOn = true;
-					aReverse = false;
-					bReverse = false;
-					break;
-				case 1: // A+B reverse
-					aOn = true;
-					bOn = true;
-					aReverse = true;
-					bReverse = true;
-					break;
-				default:
-					aOn = false;
-					bOn = false;
-					aReverse = false;
-					bReverse = false;
-					break;
-			}
-			LATAbits.LATA4 = 0;		// LED On
-			for (j = 1; j <= PWM_MAX; ++j) {
-				if (j == 127) LATAbits.LATA4 = 1;	// LED Off
-				// Set motor A
-				if (aOn) {
-					SetMotorA(aReverse, j);
-				} else {
-					SetMotorA(aReverse, 0);
-				}
-				// Set motor B
-				if (bOn) {
-					SetMotorB(bReverse, j);
-				} else {
-					SetMotorB(bReverse, 0);
-				}
-				// Wait
-				Delay_ms(PWM2_SEQ_DELAY_MS);
-			}
-			LATAbits.LATA4 = 0;		// LED On
-			Delay_ms(PWM2_FULL_DELAY_MS);
-			for (j = PWM_MAX; j > 0; --j) {
-				if (j == 127) LATAbits.LATA4 = 1;	// LED Off
-				// Set motor A
-				if (aOn) {
-					SetMotorA(aReverse, j);
-				} else {
-					SetMotorA(aReverse, 0);
-				}
-				// Set motor B
-				if (bOn) {
-					SetMotorB(bReverse, j);
-				} else {
-					SetMotorB(bReverse, 0);
-				}
-				// Wait
-				Delay_ms(PWM2_SEQ_DELAY_MS);
-			}
-		}
 	}
 }

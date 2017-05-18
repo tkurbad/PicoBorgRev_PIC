@@ -1,5 +1,3 @@
-typedef unsigned char uint8_t;
-typedef unsigned short uint16_t;
 typedef enum { false, true } bool;
 
 /******************************************************************************/
@@ -65,9 +63,9 @@ typedef enum { false, true } bool;
 /* Global variables                                                           */
 /******************************************************************************/
 
-extern uint16_t i2cSend[I2C_MAX_LEN];
-extern uint16_t i2cRecv[I2C_MAX_LEN];
-extern uint8_t i2cByte;
+extern unsigned short i2cSend[I2C_MAX_LEN];
+extern unsigned short i2cRecv[I2C_MAX_LEN];
+extern unsigned char i2cByte;
 extern bool epoTripped;
 extern bool epoIgnored;
 extern char junk;
@@ -84,7 +82,7 @@ extern int remainingCountsB;
 /******************************************************************************/
 
 void ConfigureOscillator(void);
-void Delay_ms(uint16_t ms);
+void Delay_ms(unsigned short ms);
 
 /******************************************************************************/
 /* User Function Prototypes                                                   */
@@ -95,7 +93,9 @@ void SetMotorA(bool reverse, int pwm);
 void SetMotorB(bool reverse, int pwm);
 void SetAllMotors(bool reverse, int pwm);
 void SetEncoderMode(bool enabled);
+/*
 void MoveMotorA(bool reverse, int count);
 void MoveMotorB(bool reverse, int count);
+*/
 void ProcessI2C(int len);
 
