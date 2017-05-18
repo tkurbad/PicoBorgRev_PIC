@@ -66,8 +66,8 @@ void Delay_ms(unsigned short ms) {
 /* User Global Variable Declaration                                           */
 /******************************************************************************/
 
-unsigned short i2cSend[I2C_MAX_LEN] = {0};
-unsigned short i2cRecv[I2C_MAX_LEN] = {0};
+unsigned char i2cSend[I2C_MAX_LEN] = {0};
+unsigned char i2cRecv[I2C_MAX_LEN] = {0};
 unsigned char i2cByte = 0;
 bool epoTripped = false;
 bool epoIgnored = false;
@@ -285,7 +285,6 @@ void SetEncoderMode(bool enabled) {
 	}
 }
 
-/*
 void MoveMotorA(bool reverse, int count) {
 	// Check we are in encoder mode before starting
 	if (!encMode) {
@@ -317,7 +316,6 @@ void MoveMotorB(bool reverse, int count) {
 	// Set the moving flag
 	movingB = true;
 }
-*/
 
 void ProcessI2C(int len) {
 	int i;
@@ -485,7 +483,6 @@ void ProcessI2C(int len) {
 				i2cSend[1] = COMMAND_VALUE_OFF;
 			}
 			break;
-        /*
 		case COMMAND_MOVE_A_FWD:
 			if (len < 4) break;
 			MoveMotorA(false, ((int)i2cRecv[2] << 8) + (int)i2cRecv[3]);
@@ -518,7 +515,6 @@ void ProcessI2C(int len) {
 			MoveMotorB(true, ((int)i2cRecv[2] << 8) + (int)i2cRecv[3]);
 			echo = true; len = 4;
 			break;
-        */
 		case COMMAND_GET_ENC_MOVING:
 			i2cSend[0] = COMMAND_GET_ENC_MOVING;
 			if (movingA || movingB) {
@@ -529,20 +525,12 @@ void ProcessI2C(int len) {
 			break;
 		case COMMAND_SET_ENC_SPEED:
 			if (len < 3) break;
-			if (i2cRecv[2] > PWM_MAX) {
-				encLimit = PWM_MAX;
-			} else {
-				encLimit = i2cRecv[2];
-			}
+            encLimit = i2cRecv[2];
 			echo = true; len = 3;
 			break;
 		case COMMAND_GET_ENC_SPEED:
 			i2cSend[0] = COMMAND_GET_ENC_SPEED;
-			if (encLimit > PWM_MAX) {
-				i2cSend[1] = PWM_MAX;
-			} else {
-				i2cSend[1] = encLimit;
-			}
+			i2cSend[1] = encLimit;
 			break;
 		case COMMAND_GET_ID:
 			i2cSend[0] = COMMAND_GET_ID;

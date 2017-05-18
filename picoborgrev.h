@@ -63,8 +63,8 @@ typedef enum { false, true } bool;
 /* Global variables                                                           */
 /******************************************************************************/
 
-extern unsigned short i2cSend[I2C_MAX_LEN];
-extern unsigned short i2cRecv[I2C_MAX_LEN];
+extern unsigned char i2cSend[I2C_MAX_LEN];
+extern unsigned char i2cRecv[I2C_MAX_LEN];
 extern unsigned char i2cByte;
 extern bool epoTripped;
 extern bool epoIgnored;
@@ -93,9 +93,6 @@ void SetMotorA(bool reverse, int pwm);
 void SetMotorB(bool reverse, int pwm);
 void SetAllMotors(bool reverse, int pwm);
 void SetEncoderMode(bool enabled);
-/*
 void MoveMotorA(bool reverse, int count);
 void MoveMotorB(bool reverse, int count);
-*/
 void ProcessI2C(int len);
-
