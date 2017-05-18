@@ -195,7 +195,7 @@ void InitApp(void) {
 	EECON1bits.EEPGD = 0;
 	EECON1bits.CFGS = 0;
 	EECON1bits.RD = 1;
-	value = EEDAT;
+	value = EEDATL;
 	// Check against limits before setting, if out of range keep with the default
 	if ((value > 0x02) && (value < 0x78)) {
 		SSP1ADD = value << 1;
