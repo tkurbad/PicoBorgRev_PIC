@@ -65,7 +65,7 @@ typedef enum { false, true } bool;
 
 extern unsigned char i2cSend[I2C_MAX_LEN];
 extern unsigned char i2cRecv[I2C_MAX_LEN];
-extern unsigned char i2cByte;
+extern int i2cByte;
 extern bool epoTripped;
 extern bool epoIgnored;
 extern char junk;

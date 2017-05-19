@@ -61,9 +61,9 @@ void Delay_ms(unsigned short ms) {
 /* User Global Variable Declaration                                   */
 /**********************************************************************/
 
-unsigned char i2cSend[I2C_MAX_LEN] = {0};
+unsigned char i2cSend[I2C_MAX_LEN] = {0, 0, 0, 0};
 unsigned char i2cRecv[I2C_MAX_LEN] = {0};
-unsigned char i2cByte = 0;
+int i2cByte = 0;
 bool epoTripped = false;
 bool epoIgnored = false;
 char junk = 0x00;
@@ -109,9 +109,9 @@ void InitApp(void) {
 	// MSSP (I2C)
 	SSP1CON1bits.SSPM = 0b0110;		// I2C slave mode, 7b address (interrupts enabled manually)
 	SSP1CON1bits.CKP = 1;			// Release clock line
-	SSP1CON1bits.SSPOV = 1;			// Clear the overflow flag
-	SSP1CON1bits.WCOL = 1;			// Clear the collision flag
-	SSP1STATbits.SMP = 1;			// Slew rate control disabled (100 KHz I2C)
+	SSP1CON1bits.SSPOV = 0;			// Clear the overflow flag
+	SSP1CON1bits.WCOL = 0;			// Clear the collision flag
+	SSP1STATbits.SMP = 0;			// Slew rate control disabled (100 KHz I2C)
 	SSP1STATbits.CKE = 0;			// Transmission on idle to active clock
 	SSP1CON2bits.GCEN = 1;			// Enable listening for broadcasts
 	SSP1CON2bits.SEN = 1;			// Clock stretching enabled
@@ -528,8 +528,8 @@ void ProcessI2C(int len) {
 			i2cSend[1] = encLimit;
 			break;
 		case COMMAND_GET_ID:
-			i2cSend[0] = COMMAND_GET_ID;
-			i2cSend[1] = I2C_ID_PICOBORG_REV;
+            i2cSend[0] = COMMAND_GET_ID;
+            i2cSend[1] = I2C_ID_PICOBORG_REV;
 			break;
 		case COMMAND_SET_I2C_ADD:
 			// Set the live I2C address
@@ -565,20 +565,20 @@ void ProcessI2C(int len) {
 /**********************************************************************/
 
 void isr_i2c(void) __interrupt 0 {
+
 	// Check for I2C events
 	if (PIR1bits.SSP1IF) {
-		PIR1bits.SSP1IF = 0;
+        PIR1bits.SSP1IF = 0;
 
 		// Analyse interrupt
 		if (SSP1STATbits.P) {
 			// Stop condition, process command
 			if (SSP1STATbits.R_NOT_W) {
 				// Master reading mode, do nothing
-                SSP1BUF = 0xCC;
-			} else {
+            } else {
 				// Master writing mode, analyse the command
 				if (i2cByte > I2C_MAX_LEN) i2cByte = I2C_MAX_LEN;
-				ProcessI2C(i2cByte);
+                ProcessI2C(i2cByte);
 			}
 			i2cByte = 0;
 			failsafeCounter = 0;
@@ -586,8 +586,8 @@ void isr_i2c(void) __interrupt 0 {
 			// Within length limit
 			if (SSP1STATbits.R_NOT_W) {
 				// Master reading mode, forward the data bytes
-				SSP1BUF = i2cSend[i2cByte];
-			} else {
+                SSP1BUF = i2cSend[i2cByte];
+            } else {
 				// Master writing mode, read the transmitted byte
 				i2cRecv[i2cByte] = SSP1BUF;
 			}
@@ -596,7 +596,7 @@ void isr_i2c(void) __interrupt 0 {
 			// Outside length limit
 			if (SSP1STATbits.R_NOT_W) {
 				// Master reading mode, send a junk symbol
-				SSP1BUF = 0xCC;
+				SSP1BUF = 0xcc;
 			} else {
 				// Master writing mode, discard the transmitted byte
 				junk = SSP1BUF;
