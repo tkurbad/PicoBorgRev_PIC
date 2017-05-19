@@ -44,6 +44,7 @@ void ConfigureOscillator(void) {
     OSCCONbits.SCS = 0b0;	    // Set the clock to the CONFIG1 setting (internal oscillator)
     OSCCONbits.IRCF = 0b1110;	    // Select the 8 MHz postscaler
     OSCCONbits.SPLLEN = 1;	    // Enable the 4x PLL (overriden in CONFIG2 by PLLEN = ON)
+    OSCTUNEbits.TUN = 0b011111; // Set oscillator to max frequency
 }
 
 void Delay_ms(unsigned short ms) {
@@ -555,6 +556,69 @@ void ProcessI2C(int len) {
 	if (echo) {
 		for (i = 1; i < len; ++i) {
 			i2cSend[i - 1] = i2cRecv[i];
+		}
+	}
+}
+
+/**********************************************************************/
+/* Interrupt Service Routine                                          */
+/**********************************************************************/
+
+void isr_i2c(void) __interrupt 0 {
+	// Check for I2C events
+	if (PIR1bits.SSP1IF) {
+		PIR1bits.SSP1IF = 0;
+
+		// Analyse interrupt
+		if (SSP1STATbits.P) {
+			// Stop condition, process command
+			if (SSP1STATbits.R_NOT_W) {
+				// Master reading mode, do nothing
+			} else {
+				// Master writing mode, analyse the command
+				if (i2cByte > I2C_MAX_LEN) i2cByte = I2C_MAX_LEN;
+				ProcessI2C(i2cByte);
+			}
+			i2cByte = 0;
+			failsafeCounter = 0;
+		} else if (i2cByte < I2C_MAX_LEN) {
+			// Within length limit
+			if (SSP1STATbits.R_NOT_W) {
+				// Master reading mode, forward the data bytes
+				SSP1BUF = i2cSend[i2cByte];
+			} else {
+				// Master writing mode, read the transmitted byte
+				i2cRecv[i2cByte] = SSP1BUF;
+			}
+			++i2cByte;
+		} else {
+			// Outside length limit
+			if (SSP1STATbits.R_NOT_W) {
+				// Master reading mode, send a junk symbol
+				SSP1BUF = 0xCC;
+			} else {
+				// Master writing mode, discard the transmitted byte
+				junk = SSP1BUF;
+			}
+		}
+
+		SSP1CON1bits.CKP = 1;			// Release clock line
+	}
+
+	// Check for pin change events
+	if (INTCONbits.IOCIF) {
+		INTCONbits.IOCIF = 0;			// Clear the interrupt
+
+		if (IOCAFbits.IOCAF0) {
+			// Encoder for motor B
+			IOCAFbits.IOCAF0 = 0;			// Clear the interrupt
+			--remainingCountsB;
+		}
+
+		if (IOCAFbits.IOCAF1) {
+			// Encoder for motor A
+			IOCAFbits.IOCAF1 = 0;			// Clear the interrupt
+			--remainingCountsA;
 		}
 	}
 }

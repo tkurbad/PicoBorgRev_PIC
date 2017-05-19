@@ -4,7 +4,7 @@ typedef enum { false, true } bool;
 /* System #define Macros                                                  */
 /******************************************************************************/
 
-#define SYS_FREQ                32000000L
+#define SYS_FREQ                16000000L
 #define INSTR_PER_MS            (SYS_FREQ / 1000L)
 #define LOOPS_PER_MS            (INSTR_PER_MS / 10U)
 
@@ -83,6 +83,12 @@ extern int remainingCountsB;
 
 void ConfigureOscillator(void);
 void Delay_ms(unsigned short ms);
+
+/**********************************************************************/
+/* Interrupt Service Routine                                          */
+/**********************************************************************/
+
+void isr_i2c(void) __interrupt 0;
 
 /******************************************************************************/
 /* User Function Prototypes                                                   */
