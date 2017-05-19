@@ -574,6 +574,7 @@ void isr_i2c(void) __interrupt 0 {
 			// Stop condition, process command
 			if (SSP1STATbits.R_NOT_W) {
 				// Master reading mode, do nothing
+                SSP1BUF = 0xCC;
 			} else {
 				// Master writing mode, analyse the command
 				if (i2cByte > I2C_MAX_LEN) i2cByte = I2C_MAX_LEN;
