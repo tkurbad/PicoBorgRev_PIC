@@ -4,13 +4,7 @@
 // Rewritten for sdcc by Torsten Kurbad <beaglebone@tk-webart.de>
 
 
-//To compile:
-//sdcc -mpic14 -p16f1824 --use-non-free main.c
- 
-//To program the chip using pk2cmd:
-//pk2cmd -M -PPIC16f1824 -Fmain.hex
-
-/* Avoid polluting the global namespace with aliases for each pin. */
+// Avoid polluting the global namespace with aliases for each pin.
 #define NO_BIT_DEFINES
 
 // PicoBorg Reverse uses a PIC16F1824 for I2C communication
@@ -19,7 +13,7 @@
 
 #include "picoborgrev.h"
 
-//Set the configuration words:
+// Set the configuration words:
 __code unsigned short __at (_CONFIG1) configWord1 = (
     _FOSC_INTOSC &
     _WDTE_OFF &
@@ -42,9 +36,9 @@ __code unsigned short __at (_CONFIG2) configWord2 = (
     _LVP_OFF
     );
 
-/******************************************************************************/
-/* System Functions                                                             */
-/******************************************************************************/
+/**********************************************************************/
+/* System Functions                                                   */
+/**********************************************************************/
 
 void ConfigureOscillator(void) {
     OSCCONbits.SCS = 0b0;	    // Set the clock to the CONFIG1 setting (internal oscillator)
@@ -62,9 +56,9 @@ void Delay_ms(unsigned short ms) {
 }
 
 
-/******************************************************************************/
-/* User Global Variable Declaration                                           */
-/******************************************************************************/
+/**********************************************************************/
+/* User Global Variable Declaration                                   */
+/**********************************************************************/
 
 unsigned char i2cSend[I2C_MAX_LEN] = {0};
 unsigned char i2cRecv[I2C_MAX_LEN] = {0};
@@ -80,9 +74,9 @@ int encLimit = 255;
 int remainingCountsA = 0;
 int remainingCountsB = 0;
 
-/******************************************************************************/
-/* User Functions                                                             */
-/******************************************************************************/
+/**********************************************************************/
+/* User Functions                                                     */
+/**********************************************************************/
 
 void InitApp(void) {
 	unsigned char value;
@@ -566,9 +560,9 @@ void ProcessI2C(int len) {
 }
 
 
-/******************************************************************************/
-/* Main Program                                                               */
-/******************************************************************************/
+/**********************************************************************/
+/* Main Program                                                       */
+/**********************************************************************/
 
 void main(void) {
 	// Configure the oscillator for the device
