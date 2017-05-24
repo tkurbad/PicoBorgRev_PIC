@@ -18,6 +18,8 @@ typedef enum { false, true } bool;
 
 #define I2C_ID_PICOBORG_REV		(0x15)
 
+#define COMMAND_NONE            (0)     // Initialization value
+
 #define COMMAND_SET_LED			(1)		// Set the LED status
 #define COMMAND_GET_LED			(2)		// Get the LED status
 #define COMMAND_SET_A_FWD		(3)		// Set motor A PWM rate in a forwards direction
@@ -66,9 +68,15 @@ typedef enum { false, true } bool;
 extern unsigned char i2cSend[I2C_MAX_LEN];
 extern unsigned char i2cRecv[I2C_MAX_LEN];
 extern int i2cByte;
+extern char junk;
+
+extern unsigned char i2cAddress;
+extern unsigned char i2cCommand;
+extern unsigned char i2cRXData[I2C_MAX_LEN];
+extern int dataByte;
+
 extern bool epoTripped;
 extern bool epoIgnored;
-extern char junk;
 extern int failsafeCounter;
 extern bool encMode;
 extern bool movingA;

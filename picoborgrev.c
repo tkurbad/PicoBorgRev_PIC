@@ -64,9 +64,16 @@ void Delay_ms(unsigned short ms) {
 unsigned char i2cSend[I2C_MAX_LEN] = {0, 0, 0, 0};
 unsigned char i2cRecv[I2C_MAX_LEN] = {0};
 int i2cByte = 0;
+char junk = 0x00;
+
+unsigned char i2cAddress = 0x00;
+unsigned char i2cCommand = 0x00;
+unsigned char i2cRXData[I2C_MAX_LEN] = {0};
+unsigned char i2cTXData[I2C_MAX_LEN] = {0};
+int dataByte = 0;
+
 bool epoTripped = false;
 bool epoIgnored = false;
-char junk = 0x00;
 int failsafeCounter = 0;
 bool encMode = false;
 bool movingA = false;
@@ -312,6 +319,7 @@ void MoveMotorB(bool reverse, int count) {
 	movingB = true;
 }
 
+/*
 void ProcessI2C(int len) {
 	int i;
 	bool echo = false;
@@ -340,14 +348,6 @@ void ProcessI2C(int len) {
 				LATAbits.LATA4 = 0;		// LED On
 			}
 			echo = true; len = 3;
-			break;
-		case COMMAND_GET_LED:
-			i2cSend[0] = COMMAND_GET_LED;
-			if (PORTAbits.RA4 == 1) {
-				i2cSend[1] = COMMAND_VALUE_OFF;
-			} else {
-				i2cSend[1] = COMMAND_VALUE_ON;
-			}
 			break;
 		case COMMAND_SET_A_FWD:
 			if (len < 3) break;
@@ -559,11 +559,87 @@ void ProcessI2C(int len) {
 		}
 	}
 }
+*/
 
 /**********************************************************************/
 /* Interrupt Service Routine                                          */
 /**********************************************************************/
 
+void isr_i2c(void) __interrupt 0 {
+    // I2C event occured?
+    if (PIR1bits.SSP1IF) {
+        PIR1bits.SSP1IF = 0;
+        SSP1CON1bits.CKP = 0;
+        if (SSP1STATbits.P) {
+            // Stop
+            i2cCommand = COMMAND_NONE;
+        }
+        if (!SSP1STATbits.D_NOT_A) {
+            if (SSP1STATbits.R_NOT_W) {
+                // Master wants to read
+                switch(i2cCommand) {
+                    case COMMAND_GET_LED:
+                        if (PORTAbits.RA4 == 1) {
+                            SSP1BUF = COMMAND_VALUE_OFF;
+                        } else {
+                            SSP1BUF = COMMAND_VALUE_ON;
+                        }
+                        SSP1CON1bits.CKP = 1;
+                        break;
+                    case COMMAND_GET_A:
+                        if (PORTCbits.RC2 == 0) {
+                            SSP1BUF = COMMAND_VALUE_FWD;
+                        } else {
+                            SSP1BUF = COMMAND_VALUE_REV;
+                        }
+                        break;
+                    case COMMAND_GET_ID:
+                        SSP1BUF = I2C_ID_PICOBORG_REV;
+                        SSP1CON1bits.CKP = 1;
+                        break;
+                    default:
+                        SSP1BUF = 0x00;
+                        SSP1CON1bits.CKP = 1;
+                        break;
+                }
+            } else {
+                // Master wants to write
+                i2cAddress = SSP1BUF;
+                SSP1CON1bits.CKP = 1;
+            }
+        } else {
+            if (SSP1STATbits.R_NOT_W) {
+                // Master wants to read
+
+                // Send possible 2nd byte for read command
+                switch(i2cCommand) {
+                    case COMMAND_GET_LED:
+                        break;
+                    case COMMAND_GET_A:
+                        if (PORTCbits.RC2 == 0) {
+                            SSP1BUF = (char)(0xFF & ((CCPR2L << 2) | CCP2CONbits.DC2B));
+                        } else {
+                            SSP1BUF = PWM_MAX - (char)(0xFF & ((CCPR2L << 2) | CCP2CONbits.DC2B));
+                        }
+                        break;
+                    case COMMAND_GET_ID:
+                        break;
+                    default:
+                        break;
+                }
+                SSP1CON1bits.CKP = 1;
+            } else {
+                // Master wants to write
+                if (i2cCommand == COMMAND_NONE) {
+                    i2cCommand = SSP1BUF;                    
+                }
+                SSP1CON1bits.CKP = 1;
+            }
+        }
+    }
+}
+
+/*
 void isr_i2c(void) __interrupt 0 {
 
 	// Check for I2C events
@@ -623,7 +699,7 @@ void isr_i2c(void) __interrupt 0 {
 		}
 	}
 }
-
+*/
 
 /**********************************************************************/
 /* Main Program                                                       */
