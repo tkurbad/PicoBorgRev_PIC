@@ -60,6 +60,7 @@ typedef enum { false, true } bool;
 
 #define EEPROM_I2C_ADDRESS		(0x00)	// Saved I2C address
 
+#define I2C_DATA_NONE           (0x00)  // Empty data byte
 
 /******************************************************************************/
 /* Global variables                                                           */
@@ -73,7 +74,7 @@ extern char junk;
 extern unsigned char i2cAddress;
 extern unsigned char i2cCommand;
 extern unsigned char i2cRXData[I2C_MAX_LEN];
-extern int dataByte;
+extern int byteCount;
 
 extern bool epoTripped;
 extern bool epoIgnored;
