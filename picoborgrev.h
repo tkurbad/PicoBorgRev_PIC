@@ -13,7 +13,7 @@ typedef enum { false, true } bool;
 /******************************************************************************/
 
 #define PWM_MAX					(255)
-#define I2C_MAX_LEN				(4)
+#define I2C_MAX_LEN				(2)
 #define FAILSAFE_LIMIT			(31)	// Approximately 0.25 seconds at a 122 Hz timer
 
 #define I2C_ID_PICOBORG_REV		(0x15)
@@ -66,15 +66,12 @@ typedef enum { false, true } bool;
 /* Global variables                                                           */
 /******************************************************************************/
 
-extern unsigned char i2cSend[I2C_MAX_LEN];
-extern unsigned char i2cRecv[I2C_MAX_LEN];
-extern int i2cByte;
-extern char junk;
-
 extern unsigned char i2cAddress;
 extern unsigned char i2cCommand;
 extern unsigned char i2cRXData[I2C_MAX_LEN];
+extern char junk;
 extern int byteCount;
+extern bool finished;
 
 extern bool epoTripped;
 extern bool epoIgnored;

@@ -15,45 +15,45 @@
 
 // Set the configuration words:
 __code unsigned short __at (_CONFIG1) configWord1 = (
-    _FOSC_INTOSC &
-    _WDTE_OFF &
-    _PWRTE_ON &
-    _MCLRE_ON &
-    _CP_OFF &
-    _CPD_OFF &
-    _BOREN_ON &
-    _CLKOUTEN_OFF &
-    _IESO_OFF &
-    _FCMEN_ON
-    );
+	_FOSC_INTOSC &
+	_WDTE_OFF &
+	_PWRTE_ON &
+	_MCLRE_ON &
+	_CP_OFF &
+	_CPD_OFF &
+	_BOREN_ON &
+	_CLKOUTEN_OFF &
+	_IESO_OFF &
+	_FCMEN_ON
+	);
 
 __code unsigned short __at (_CONFIG2) configWord2 = (
-    _WRT_OFF &
-    _PLLEN_ON &
-    _STVREN_ON &
-    _BORV_LO &
-    _DEBUG_OFF &
-    _LVP_OFF
-    );
+	_WRT_OFF &
+	_PLLEN_ON &
+	_STVREN_ON &
+	_BORV_LO &
+	_DEBUG_OFF &
+	_LVP_OFF
+	);
 
 /**********************************************************************/
 /* System Functions                                                   */
 /**********************************************************************/
 
 void ConfigureOscillator(void) {
-    OSCCONbits.SCS = 0b0;	    // Set the clock to the CONFIG1 setting (internal oscillator)
-    OSCCONbits.IRCF = 0b1110;	    // Select the 8 MHz postscaler
-    OSCCONbits.SPLLEN = 1;	    // Enable the 4x PLL (overriden in CONFIG2 by PLLEN = ON)
-    OSCTUNEbits.TUN = 0b011111; // Set oscillator to max frequency
+	OSCCONbits.SCS = 0b0;	    // Set the clock to the CONFIG1 setting (internal oscillator)
+	OSCCONbits.IRCF = 0b1110;	    // Select the 8 MHz postscaler
+	OSCCONbits.SPLLEN = 1;	    // Enable the 4x PLL (overriden in CONFIG2 by PLLEN = ON)
+	OSCTUNEbits.TUN = 0b011111; // Set oscillator to max frequency
 }
 
 void Delay_ms(unsigned short ms) {
-    int u;
-    while (ms--) {
-        for(u = 0; u < LOOPS_PER_MS; u++) {
-            Nop();
-        }
-    }
+	int u;
+	while (ms--) {
+		for(u = 0; u < LOOPS_PER_MS; u++) {
+			Nop();
+		}
+	}
 }
 
 
@@ -61,15 +61,12 @@ void Delay_ms(unsigned short ms) {
 /* User Global Variable Declaration                                   */
 /**********************************************************************/
 
-unsigned char i2cSend[I2C_MAX_LEN] = {0, 0, 0, 0};
-unsigned char i2cRecv[I2C_MAX_LEN] = {0};
-int i2cByte = 0;
-char junk = 0x00;
-
 unsigned char i2cAddress = 0x00;
 unsigned char i2cCommand = 0x00;
-unsigned char i2cRXData[I2C_MAX_LEN] = {0};
+unsigned char i2cRXData[I2C_MAX_LEN] = {0x00};
+char junk = 0x00;
 int byteCount = 0;
+bool finished = false;
 
 bool epoTripped = false;
 bool epoIgnored = false;
@@ -88,29 +85,29 @@ int remainingCountsB = 0;
 void InitApp(void) {
 	unsigned char value;
 
-    /* Setup analog functionality and port direction */
+	/* Setup analog functionality and port direction */
 	ANSELA = 0;						// All digital IO, port A
 	ANSELC = 0;						// All digital IO, port C
 	TRISAbits.TRISA0 = 1;			// Encoder line for B
 	TRISAbits.TRISA1 = 1;			// Encoder line for A
-    TRISAbits.TRISA2 = 1;   		// Error flag
-    TRISAbits.TRISA4 = 0;   		// LED
-    TRISAbits.TRISA5 = 1;   		// EPO
-    TRISCbits.TRISC1 = 1;   		// I2C Data
-    TRISCbits.TRISC0 = 1;   		// I2C Clock
-    TRISCbits.TRISC3 = 0;   		// Motor A:1
-    TRISCbits.TRISC2 = 0;   		// Motor A:2
-    TRISCbits.TRISC5 = 0;   		// Motor B:1
-    TRISCbits.TRISC4 = 0;   		// Motor B:2
+	TRISAbits.TRISA2 = 1;   		// Error flag
+	TRISAbits.TRISA4 = 0;   		// LED
+	TRISAbits.TRISA5 = 1;   		// EPO
+	TRISCbits.TRISC1 = 1;   		// I2C Data
+	TRISCbits.TRISC0 = 1;   		// I2C Clock
+	TRISCbits.TRISC3 = 0;   		// Motor A:1
+	TRISCbits.TRISC2 = 0;   		// Motor A:2
+	TRISCbits.TRISC5 = 0;   		// Motor B:1
+	TRISCbits.TRISC4 = 0;   		// Motor B:2
 
-    /* Initialize peripherals */
+	/* Initialize peripherals */
 
 	// Ports
-    PORTAbits.RA4 = 0;   			// LED On
-    PORTCbits.RC3 = 0;   			// Motor A:1 Off
-    PORTCbits.RC2 = 0;   			// Motor A:2 Off
-    PORTCbits.RC5 = 0;   			// Motor B:1 Off
-    PORTCbits.RC4 = 0;   			// Motor B:2 Off
+	PORTAbits.RA4 = 0;   			// LED On
+	PORTCbits.RC3 = 0;   			// Motor A:1 Off
+	PORTCbits.RC2 = 0;   			// Motor A:2 Off
+	PORTCbits.RC5 = 0;   			// Motor B:1 Off
+	PORTCbits.RC4 = 0;   			// Motor B:2 Off
 
 	// MSSP (I2C)
 	SSP1CON1bits.SSPM = 0b0110;		// I2C slave mode, 7b address (interrupts enabled manually)
@@ -190,7 +187,7 @@ void InitApp(void) {
 	IOCAPbits.IOCAP1 = 1;			// Enable interrupts on rising A1 (Encoder line for A)
 	INTCONbits.IOCIF = 0;			// Clear interrupt flag
 
-    /* Read EEPROM settings */
+	/* Read EEPROM settings */
 	// Read the I2C address
 	EEADRL = EEPROM_I2C_ADDRESS;
 	EECON1bits.EEPGD = 0;
@@ -318,459 +315,498 @@ void MoveMotorB(bool reverse, int count) {
 	movingB = true;
 }
 
-/*
-void ProcessI2C(int len) {
-	int i;
-	bool echo = false;
-
-	// Clear the reply buffer
-	for (i = 0; i < I2C_MAX_LEN; ++i) {
-		i2cSend[i] = 0;
-	}
-
-	if (len < 2) return;
-
-	if (i2cRecv[0] == 0x00) {
-		// Broadcast message, only used for setting up the I2C address
-		if ((i2cRecv[1] != COMMAND_SET_I2C_ADD) &&
-			(i2cRecv[1] != COMMAND_GET_ID)) {
-			return;
-		}
-	}
-
-	switch (i2cRecv[1]) {
-		case COMMAND_SET_LED:
-			if (len < 3) break;
-			if (i2cRecv[2] == COMMAND_VALUE_OFF) {
-				LATAbits.LATA4 = 1;		// LED Off
-			} else {
-				LATAbits.LATA4 = 0;		// LED On
-			}
-			echo = true; len = 3;
-			break;
-		case COMMAND_SET_A_FWD:
-			if (len < 3) break;
-			SetMotorA(false, (int)i2cRecv[2]);
-			echo = true; len = 3;
-			break;
-		case COMMAND_SET_A_REV:
-			if (len < 3) break;
-			SetMotorA(true, (int)i2cRecv[2]);
-			echo = true; len = 3;
-			break;
-		case COMMAND_SET_B_FWD:
-			if (len < 3) break;
-			SetMotorB(false, (int)i2cRecv[2]);
-			echo = true; len = 3;
-			break;
-		case COMMAND_SET_B_REV:
-			if (len < 3) break;
-			SetMotorB(true, (int)i2cRecv[2]);
-			echo = true; len = 3;
-			break;
-		case COMMAND_ALL_OFF:
-			SetAllMotors(false, 0);
-			LATAbits.LATA4 = 1;		// LED Off
-			movingA = false;
-			movingB = false;
-			echo = true; len = 3;
-			break;
-		case COMMAND_RESET_EPO:
-			epoTripped = false;
-			echo = true;
-			break;
-		case COMMAND_SET_EPO_IGNORE:
-			if (len < 3) break;
-			if (i2cRecv[2] == COMMAND_VALUE_OFF) {
-				epoIgnored = false;
-			} else {
-				epoIgnored = true;
-			}
-			echo = true; len = 3;
-			break;
-		case COMMAND_SET_ALL_FWD:
-			if (len < 3) break;
-			SetAllMotors(false, (int)i2cRecv[2]);
-			echo = true; len = 3;
-			break;
-		case COMMAND_SET_ALL_REV:
-			if (len < 3) break;
-			SetAllMotors(true, (int)i2cRecv[2]);
-			echo = true; len = 3;
-			break;
-		case COMMAND_SET_FAILSAFE:
-			if (len < 3) break;
-			if (i2cRecv[2] == COMMAND_VALUE_OFF) {
-				T4CONbits.TMR4ON = 0;			// Timer 4 disabled
-			} else {
-				T4CONbits.TMR4ON = 1;			// Timer 4 enabled
-			}
-			PIR3bits.TMR4IF = 0;			// Clear Timer 4 interrupt flag
-			echo = true; len = 3;
-			break;
-		case COMMAND_SET_ENC_MODE:
-			if (len < 3) break;
-			if (i2cRecv[2] == COMMAND_VALUE_OFF) {
-				SetEncoderMode(false);
-			} else {
-				SetEncoderMode(true);
-			}
-			echo = true; len = 3;
-			break;
-		case COMMAND_MOVE_A_FWD:
-			if (len < 4) break;
-			MoveMotorA(false, ((int)i2cRecv[2] << 8) + (int)i2cRecv[3]);
-			echo = true; len = 4;
-			break;
-		case COMMAND_MOVE_A_REV:
-			if (len < 4) break;
-			MoveMotorA(true, ((int)i2cRecv[2] << 8) + (int)i2cRecv[3]);
-			echo = true; len = 4;
-			break;
-		case COMMAND_MOVE_B_FWD:
-			if (len < 4) break;
-			MoveMotorB(false, ((int)i2cRecv[2] << 8) + (int)i2cRecv[3]);
-			echo = true; len = 4;
-			break;
-		case COMMAND_MOVE_B_REV:
-			if (len < 4) break;
-			MoveMotorB(true, ((int)i2cRecv[2] << 8) + (int)i2cRecv[3]);
-			echo = true; len = 4;
-			break;
-		case COMMAND_MOVE_ALL_FWD:
-			if (len < 4) break;
-			MoveMotorA(false, ((int)i2cRecv[2] << 8) + (int)i2cRecv[3]);
-			MoveMotorB(false, ((int)i2cRecv[2] << 8) + (int)i2cRecv[3]);
-			echo = true; len = 4;
-			break;
-		case COMMAND_MOVE_ALL_REV:
-			if (len < 4) break;
-			MoveMotorA(true, ((int)i2cRecv[2] << 8) + (int)i2cRecv[3]);
-			MoveMotorB(true, ((int)i2cRecv[2] << 8) + (int)i2cRecv[3]);
-			echo = true; len = 4;
-			break;
-		case COMMAND_SET_ENC_SPEED:
-			if (len < 3) break;
-            encLimit = i2cRecv[2];
-			echo = true; len = 3;
-			break;
-		case COMMAND_GET_ID:
-            i2cSend[0] = COMMAND_GET_ID;
-            i2cSend[1] = I2C_ID_PICOBORG_REV;
-			break;
-		case COMMAND_SET_I2C_ADD:
-			// Set the live I2C address
-			SSP1ADD = i2cRecv[2] << 1;
-			// Save the I2C address to EEPROM
-			PIR2bits.EEIF = 0;
-			EECON1bits.WREN = 1;
-			EEADRL = EEPROM_I2C_ADDRESS;
-			EEDATL = i2cRecv[2];
-			EECON2 = 0x55;
-			EECON2 = 0xAA;
-			EECON1bits.WR = 1;
-			while (PIR2bits.EEIF == 0) ;
-			PIR2bits.EEIF = 0;
-			EECON1bits.WREN = 0;
-			echo = true; len = 3;
-			break;
-        default:
-			// Do nothing
-			break;
-	}
-
-	// Echo sent command if required
-	if (echo) {
-		for (i = 1; i < len; ++i) {
-			i2cSend[i - 1] = i2cRecv[i];
-		}
-	}
-}
-*/
 
 /**********************************************************************/
 /* Interrupt Service Routine                                          */
 /**********************************************************************/
 
 void isr_i2c(void) __interrupt 0 {
-    // I2C event occured?
-    if (PIR1bits.SSP1IF) {
-        PIR1bits.SSP1IF = 0;
-
-        // Hold clock line
-        SSP1CON1bits.CKP = 0;
-
-        if (SSP1STATbits.P) {
-            // Stop
-            i2cCommand = COMMAND_NONE;
-            byteCount = 0;
-
-            // Release clock line
-            SSP1CON1bits.CKP = 0;
-
-            // Stop processing
-            return;
-        }
-
-        if (!SSP1STATbits.D_NOT_A) {
-            if (SSP1STATbits.R_NOT_W) {
-                // * Master wants to read *
-
-                // Send command byte back to the master
-                switch(i2cCommand) {
-                    case COMMAND_GET_LED:
-                        SSP1BUF = COMMAND_GET_LED;
-                        break;
-                    case COMMAND_GET_A:
-                        SSP1BUF = COMMAND_GET_A;
-                        break;
-                    case COMMAND_GET_B:
-                        SSP1BUF = COMMAND_GET_B;
-                        break;
-                    case COMMAND_GET_EPO:
-                        SSP1BUF = COMMAND_GET_EPO;
-                        break;
-                    case COMMAND_GET_EPO_IGNORE:
-                        SSP1BUF = COMMAND_GET_EPO_IGNORE;
-                        break;
-                    case COMMAND_GET_DRIVE_FAULT:
-                        SSP1BUF = COMMAND_GET_DRIVE_FAULT;
-                        break;
-                    case COMMAND_GET_FAILSAFE:
-                        SSP1BUF = COMMAND_GET_FAILSAFE;
-                        break;
-                    case COMMAND_GET_ENC_MODE:
-                        SSP1BUF = COMMAND_GET_ENC_MODE;
-                        break;
-                    case COMMAND_GET_ENC_MOVING:
-                        SSP1BUF = COMMAND_GET_ENC_MOVING;
-                        break;
-                    case COMMAND_GET_ENC_SPEED:
-                        SSP1BUF = COMMAND_GET_ENC_SPEED;
-                        break;
-                    case COMMAND_GET_ID:
-                        SSP1BUF = I2C_ID_PICOBORG_REV;
-                        break;
-                    default:
-                        SSP1BUF = I2C_DATA_NONE;
-                        break;
-                }
-
-                // Release clock line
-                SSP1CON1bits.CKP = 1;
-            } else {
-                // * Master wants to write *
-                i2cAddress = SSP1BUF;
-                SSP1CON1bits.CKP = 1;
-            }
-        } else {
-            if (SSP1STATbits.R_NOT_W) {
-                // * Master wants to read *
-
-                // Send data bytes to master
-                switch(i2cCommand) {
-                    case COMMAND_GET_LED:
-                        // LED status is one data byte
-                        if (PORTAbits.RA4 == 1) {
-                            SSP1BUF = COMMAND_VALUE_OFF;
-                        } else {
-                            SSP1BUF = COMMAND_VALUE_ON;
-                        }
-                        i2cCommand = COMMAND_NONE;
-                        break;
-                    case COMMAND_GET_A:
-                        if (byteCount == 0) {
-                            // First data byte denotes direction
-                            if (PORTCbits.RC2 == 0) {
-                                SSP1BUF = COMMAND_VALUE_FWD;
-                            } else {
-                                SSP1BUF = COMMAND_VALUE_REV;
-                            }
-                            ++byteCount;
-                        } else {
-                            // Second data byte denotes PWM value
-                            if (PORTCbits.RC2 == 0) {
-                                SSP1BUF = (char)(0xFF & ((CCPR2L << 2) | CCP2CONbits.DC2B));
-                            } else {
-                                SSP1BUF = PWM_MAX - (char)(0xFF & ((CCPR2L << 2) | CCP2CONbits.DC2B));
-                            }
-                            i2cCommand = COMMAND_NONE;
-                            byteCount = 0;
-                        }
-                        break;
-                    case COMMAND_GET_B:
-                        if (byteCount == 0) {
-                            // First data byte denotes direction
-                            if (PORTCbits.RC4 == 0) {
-                                SSP1BUF = COMMAND_VALUE_FWD;
-                            } else {
-                                SSP1BUF = COMMAND_VALUE_REV;
-                            }
-                            ++byteCount;
-                        } else {
-                            // Second data byte denotes PWM value
-                            if (PORTCbits.RC4 == 0) {
-                                SSP1BUF = (char)(0xFF & ((CCPR1L << 2) | CCP1CONbits.DC1B));
-                            } else {
-                                SSP1BUF = PWM_MAX - (char)(0xFF & ((CCPR1L << 2) | CCP1CONbits.DC1B));
-                            }
-                            i2cCommand = COMMAND_NONE;
-                            byteCount = 0;
-                        }
-                        break;
-                    case COMMAND_GET_EPO:
-                        // EPO tripped flag is one data byte
-                        if (epoTripped) {
-                            SSP1BUF = COMMAND_VALUE_ON;
-                        } else {
-                            SSP1BUF = COMMAND_VALUE_OFF;
-                        }
-                        i2cCommand = COMMAND_NONE;
-                        break;
-                    case COMMAND_GET_EPO_IGNORE:
-                        // EPO ignore flag is one data byte
-                        if (epoIgnored) {
-                            SSP1BUF = COMMAND_VALUE_ON;
-                        } else {
-                            SSP1BUF = COMMAND_VALUE_OFF;
-                        }
-                        i2cCommand = COMMAND_NONE;
-                        break;
-                    case COMMAND_GET_DRIVE_FAULT:
-                        // Drive fault flag is one data byte
-                        if (PORTAbits.RA2 == 1) {
-                            SSP1BUF = COMMAND_VALUE_OFF;
-                        } else {
-                            SSP1BUF = COMMAND_VALUE_ON;
-                        }
-                        i2cCommand = COMMAND_NONE;
-                        break;
-                    case COMMAND_GET_FAILSAFE:
-                        // Failsafe flag is one data byte
-                        if (T4CONbits.TMR4ON == 0) {
-                            SSP1BUF = COMMAND_VALUE_OFF;
-                        } else {
-                            SSP1BUF = COMMAND_VALUE_ON;
-                        }
-                        i2cCommand = COMMAND_NONE;
-                        break;
-                    case COMMAND_GET_ENC_MODE:
-                        // Encoder mode flag is one data byte
-                        if (encMode) {
-                            SSP1BUF = COMMAND_VALUE_ON;
-                        } else {
-                            SSP1BUF = COMMAND_VALUE_OFF;
-                        }
-                        i2cCommand = COMMAND_NONE;
-                        break;
-                    case COMMAND_GET_ENC_MOVING:
-                        // Encoder moving flag is one data byte
-                        if (movingA || movingB) {
-                            SSP1BUF = COMMAND_VALUE_ON;
-                        } else {
-                            SSP1BUF = COMMAND_VALUE_OFF;
-                        }
-                        i2cCommand = COMMAND_NONE;
-                        break;
-                    case COMMAND_GET_ENC_SPEED:
-                        // Encoder speed is one data byte
-                        SSP1BUF = encLimit;
-                        i2cCommand = COMMAND_NONE;
-                        break;
-                    case COMMAND_GET_ID:
-                        // ID is one data byte
-                        SSP1BUF = I2C_ID_PICOBORG_REV;
-                        i2cCommand = COMMAND_NONE;
-                        break;
-                    default:
-                        // No valid command given. Send empty reply.
-                        SSP1BUF = I2C_DATA_NONE;
-                        byteCount = 0;
-                        break;
-                }
-
-                // Release clock line
-                SSP1CON1bits.CKP = 1;
-            } else {
-                // * Master wants to write *
-                if (i2cCommand == COMMAND_NONE) {
-                    i2cCommand = SSP1BUF;
-
-                    // Release clock line
-                    SSP1CON1bits.CKP = 1;
-
-                    // Next cycle
-                    return;
-                }
-
-                // Release clock line
-                SSP1CON1bits.CKP = 1;
-            }
-        }
-    }
-}
-
-/*
-void isr_i2c(void) __interrupt 0 {
-
-	// Check for I2C events
+	// I2C event occured?
 	if (PIR1bits.SSP1IF) {
-        PIR1bits.SSP1IF = 0;
+		PIR1bits.SSP1IF = 0;
 
-		// Analyse interrupt
+		// Hold clock line
+		SSP1CON1bits.CKP = 0;
+
 		if (SSP1STATbits.P) {
-			// Stop condition, process command
-			if (SSP1STATbits.R_NOT_W) {
-				// Master reading mode, do nothing
-            } else {
-				// Master writing mode, analyse the command
-				if (i2cByte > I2C_MAX_LEN) i2cByte = I2C_MAX_LEN;
-                ProcessI2C(i2cByte);
+
+			// Stop - Reset everything
+			i2cCommand = COMMAND_NONE;
+			for (byteCount = 0; byteCount < I2C_MAX_LEN; ++byteCount) {
+				i2cRXData[byteCount] = 0x00;
 			}
-			i2cByte = 0;
-			failsafeCounter = 0;
-		} else if (i2cByte < I2C_MAX_LEN) {
-			// Within length limit
-			if (SSP1STATbits.R_NOT_W) {
-				// Master reading mode, forward the data bytes
-                SSP1BUF = i2cSend[i2cByte];
-            } else {
-				// Master writing mode, read the transmitted byte
-				i2cRecv[i2cByte] = SSP1BUF;
-			}
-			++i2cByte;
+			byteCount = 0;
+
 		} else {
-			// Outside length limit
-			if (SSP1STATbits.R_NOT_W) {
-				// Master reading mode, send a junk symbol
-				SSP1BUF = 0xcc;
+
+			if (!SSP1STATbits.D_NOT_A) {
+				if (SSP1STATbits.R_NOT_W) {
+					// * Master wants to read *
+
+					// Send command byte back to the master
+					switch(i2cCommand) {
+						case COMMAND_GET_LED:
+							SSP1BUF = COMMAND_GET_LED;
+							break;
+						case COMMAND_GET_A:
+							SSP1BUF = COMMAND_GET_A;
+							break;
+						case COMMAND_GET_B:
+							SSP1BUF = COMMAND_GET_B;
+							break;
+						case COMMAND_GET_EPO:
+							SSP1BUF = COMMAND_GET_EPO;
+							break;
+						case COMMAND_GET_EPO_IGNORE:
+							SSP1BUF = COMMAND_GET_EPO_IGNORE;
+							break;
+						case COMMAND_GET_DRIVE_FAULT:
+							SSP1BUF = COMMAND_GET_DRIVE_FAULT;
+							break;
+						case COMMAND_GET_FAILSAFE:
+							SSP1BUF = COMMAND_GET_FAILSAFE;
+							break;
+						case COMMAND_GET_ENC_MODE:
+							SSP1BUF = COMMAND_GET_ENC_MODE;
+							break;
+						case COMMAND_GET_ENC_MOVING:
+							SSP1BUF = COMMAND_GET_ENC_MOVING;
+							break;
+						case COMMAND_GET_ENC_SPEED:
+							SSP1BUF = COMMAND_GET_ENC_SPEED;
+							break;
+						case COMMAND_GET_ID:
+							SSP1BUF = COMMAND_GET_ID;
+							break;
+						default:
+							SSP1BUF = I2C_DATA_NONE;
+							break;
+					}
+				} else {
+					// * Master wants to write *
+					i2cAddress = SSP1BUF;
+					SSP1CON1bits.CKP = 1;
+				}
 			} else {
-				// Master writing mode, discard the transmitted byte
-				junk = SSP1BUF;
+				if (SSP1STATbits.R_NOT_W) {
+					// * Master wants to read *
+
+					// Send data bytes to master
+					switch(i2cCommand) {
+						case COMMAND_GET_LED:
+							// LED status is one data byte
+							if (PORTAbits.RA4 == 1) {
+								SSP1BUF = COMMAND_VALUE_OFF;
+							} else {
+								SSP1BUF = COMMAND_VALUE_ON;
+							}
+							i2cCommand = COMMAND_NONE;
+							break;
+						case COMMAND_GET_A:
+							if (byteCount == 0) {
+								// First data byte denotes direction
+								if (PORTCbits.RC2 == 0) {
+									SSP1BUF = COMMAND_VALUE_FWD;
+								} else {
+									SSP1BUF = COMMAND_VALUE_REV;
+								}
+								++byteCount;
+							} else {
+								// Second data byte denotes PWM value
+								if (PORTCbits.RC2 == 0) {
+									SSP1BUF = (char)(0xFF & ((CCPR2L << 2) | CCP2CONbits.DC2B));
+								} else {
+									SSP1BUF = PWM_MAX - (char)(0xFF & ((CCPR2L << 2) | CCP2CONbits.DC2B));
+								}
+								i2cCommand = COMMAND_NONE;
+								byteCount = 0;
+							}
+							break;
+						case COMMAND_GET_B:
+							if (byteCount == 0) {
+								// First data byte denotes direction
+								if (PORTCbits.RC4 == 0) {
+									SSP1BUF = COMMAND_VALUE_FWD;
+								} else {
+									SSP1BUF = COMMAND_VALUE_REV;
+								}
+								++byteCount;
+							} else {
+								// Second data byte denotes PWM value
+								if (PORTCbits.RC4 == 0) {
+									SSP1BUF = (char)(0xFF & ((CCPR1L << 2) | CCP1CONbits.DC1B));
+								} else {
+									SSP1BUF = PWM_MAX - (char)(0xFF & ((CCPR1L << 2) | CCP1CONbits.DC1B));
+								}
+								i2cCommand = COMMAND_NONE;
+								byteCount = 0;
+							}
+							break;
+						case COMMAND_GET_EPO:
+							// EPO tripped flag is one data byte
+							if (epoTripped) {
+								SSP1BUF = COMMAND_VALUE_ON;
+							} else {
+								SSP1BUF = COMMAND_VALUE_OFF;
+							}
+							i2cCommand = COMMAND_NONE;
+							break;
+						case COMMAND_GET_EPO_IGNORE:
+							// EPO ignore flag is one data byte
+							if (epoIgnored) {
+								SSP1BUF = COMMAND_VALUE_ON;
+							} else {
+								SSP1BUF = COMMAND_VALUE_OFF;
+							}
+							i2cCommand = COMMAND_NONE;
+							break;
+						case COMMAND_GET_DRIVE_FAULT:
+							// Drive fault flag is one data byte
+							if (PORTAbits.RA2 == 1) {
+								SSP1BUF = COMMAND_VALUE_OFF;
+							} else {
+								SSP1BUF = COMMAND_VALUE_ON;
+							}
+							i2cCommand = COMMAND_NONE;
+							break;
+						case COMMAND_GET_FAILSAFE:
+							// Failsafe flag is one data byte
+							if (T4CONbits.TMR4ON == 0) {
+								SSP1BUF = COMMAND_VALUE_OFF;
+							} else {
+								SSP1BUF = COMMAND_VALUE_ON;
+							}
+							i2cCommand = COMMAND_NONE;
+							break;
+						case COMMAND_GET_ENC_MODE:
+							// Encoder mode flag is one data byte
+							if (encMode) {
+								SSP1BUF = COMMAND_VALUE_ON;
+							} else {
+								SSP1BUF = COMMAND_VALUE_OFF;
+							}
+							i2cCommand = COMMAND_NONE;
+							break;
+						case COMMAND_GET_ENC_MOVING:
+							// Encoder moving flag is one data byte
+							if (movingA || movingB) {
+								SSP1BUF = COMMAND_VALUE_ON;
+							} else {
+								SSP1BUF = COMMAND_VALUE_OFF;
+							}
+							i2cCommand = COMMAND_NONE;
+							break;
+						case COMMAND_GET_ENC_SPEED:
+							// Encoder speed is one data byte
+							SSP1BUF = encLimit;
+							i2cCommand = COMMAND_NONE;
+							break;
+						case COMMAND_GET_ID:
+							// ID is one data byte
+							SSP1BUF = I2C_ID_PICOBORG_REV;
+							i2cCommand = COMMAND_NONE;
+							break;
+						default:
+							// No valid command given. Send empty reply.
+							SSP1BUF = I2C_DATA_NONE;
+							byteCount = 0;
+							break;
+					}
+				} else {
+					// * Master wants to write *
+					if (i2cCommand == COMMAND_NONE) {
+						i2cCommand = SSP1BUF;
+					} else {
+						if (byteCount > I2C_MAX_LEN) {
+							byteCount = I2C_MAX_LEN;
+						}
+
+						switch(i2cCommand) {
+							case COMMAND_SET_LED:
+								if (byteCount == 0) {
+									i2cRXData[0] = SSP1BUF;
+									if (i2cRXData[0] == COMMAND_VALUE_OFF) {
+										LATAbits.LATA4 = 1;		// LED Off
+									} else {
+										LATAbits.LATA4 = 0;		// LED On
+									}
+									i2cCommand = COMMAND_NONE;
+								}
+								if (SSP1STATbits.BF) {
+									junk = SSP1BUF;
+								}
+								++byteCount;
+								break;
+							case COMMAND_SET_A_FWD:
+								if (byteCount == 0) {
+									i2cRXData[0] = SSP1BUF;
+									SetMotorA(false, (int)i2cRXData[0]);
+									i2cCommand = COMMAND_NONE;
+								}
+								if (SSP1STATbits.BF) {
+									junk = SSP1BUF;
+								}
+								++byteCount;
+								break;
+							case COMMAND_SET_A_REV:
+								if (byteCount == 0) {
+									i2cRXData[0] = SSP1BUF;
+									SetMotorA(true, (int)i2cRXData[0]);
+									i2cCommand = COMMAND_NONE;
+								}
+								if (SSP1STATbits.BF) {
+									junk = SSP1BUF;
+								}
+								++byteCount;
+								break;
+							case COMMAND_SET_B_FWD:
+								if (byteCount == 0) {
+									i2cRXData[0] = SSP1BUF;
+									SetMotorB(false, (int)i2cRXData[0]);
+									i2cCommand = COMMAND_NONE;
+								}
+								if (SSP1STATbits.BF) {
+									junk = SSP1BUF;
+								}
+								++byteCount;
+								break;
+							case COMMAND_SET_B_REV:
+								if (byteCount == 0) {
+									i2cRXData[0] = SSP1BUF;
+									SetMotorB(true, (int)i2cRXData[0]);
+									i2cCommand = COMMAND_NONE;
+								}
+								if (SSP1STATbits.BF) {
+									junk = SSP1BUF;
+								}
+								++byteCount;
+								break;
+							case COMMAND_ALL_OFF:
+								if (byteCount == 0) {
+									SetAllMotors(false, 0);
+									LATAbits.LATA4 = 1;		// LED Off
+									movingA = false;
+									movingB = false;
+									i2cCommand = COMMAND_NONE;
+								}
+								if (SSP1STATbits.BF) {
+									junk = SSP1BUF;
+								}
+								++byteCount;
+								break;
+							case COMMAND_RESET_EPO:
+								if (byteCount == 0) {
+									epoTripped = false;
+									i2cCommand = COMMAND_NONE;
+								}
+								if (SSP1STATbits.BF) {
+									junk = SSP1BUF;
+								}
+								++byteCount;
+								break;
+							case COMMAND_SET_EPO_IGNORE:
+								if (byteCount == 0) {
+									i2cRXData[0] = SSP1BUF;
+									if (i2cRXData[0] == COMMAND_VALUE_OFF) {
+										epoIgnored = false;
+									} else {
+										epoIgnored = true;
+									}
+									i2cCommand = COMMAND_NONE;
+								}
+								if (SSP1STATbits.BF) {
+									junk = SSP1BUF;
+								}
+								++byteCount;
+								break;
+							case COMMAND_SET_ALL_FWD:
+								if (byteCount == 0) {
+									i2cRXData[0] = SSP1BUF;
+									SetAllMotors(false, (int)i2cRXData[0]);
+									i2cCommand = COMMAND_NONE;
+								}
+								if (SSP1STATbits.BF) {
+									junk = SSP1BUF;
+								}
+								++byteCount;
+								break;
+							case COMMAND_SET_ALL_REV:
+								if (byteCount == 0) {
+									i2cRXData[0] = SSP1BUF;
+									SetAllMotors(true, (int)i2cRXData[0]);
+									i2cCommand = COMMAND_NONE;
+								}
+								if (SSP1STATbits.BF) {
+									junk = SSP1BUF;
+								}
+								++byteCount;
+								break;
+							case COMMAND_SET_FAILSAFE:
+								if (byteCount == 0) {
+									i2cRXData[0] = SSP1BUF;
+									if (i2cRXData[0] == COMMAND_VALUE_OFF) {
+										T4CONbits.TMR4ON = 0;			// Timer 4 disabled
+									} else {
+										T4CONbits.TMR4ON = 1;			// Timer 4 enabled
+									}
+									PIR3bits.TMR4IF = 0;			// Clear Timer 4 interrupt flag
+									i2cCommand = COMMAND_NONE;
+								}
+								if (SSP1STATbits.BF) {
+									junk = SSP1BUF;
+								}
+								++byteCount;
+								break;
+							case COMMAND_SET_ENC_MODE:
+								if (byteCount == 0) {
+									i2cRXData[0] = SSP1BUF;
+									if (i2cRXData[0] == COMMAND_VALUE_OFF) {
+										SetEncoderMode(false);
+									} else {
+										SetEncoderMode(true);
+									}
+									i2cCommand = COMMAND_NONE;
+								}
+								if (SSP1STATbits.BF) {
+									junk = SSP1BUF;
+								}
+								++byteCount;
+								break;
+							case COMMAND_MOVE_A_FWD:
+								if (byteCount < 2) {
+									i2cRXData[byteCount] = SSP1BUF;
+									if (byteCount == 1) {
+										MoveMotorA(false, ((int)i2cRXData[0] << 8) + (int)i2cRXData[1]);
+										i2cCommand = COMMAND_NONE;
+									}
+								}
+								if (SSP1STATbits.BF) {
+									junk = SSP1BUF;
+								}
+								++byteCount;
+								break;
+							case COMMAND_MOVE_A_REV:
+								if (byteCount < 2) {
+									i2cRXData[byteCount] = SSP1BUF;
+									if (byteCount == 1) {
+										MoveMotorA(true, ((int)i2cRXData[0] << 8) + (int)i2cRXData[1]);
+										i2cCommand = COMMAND_NONE;
+									}
+								}
+								if (SSP1STATbits.BF) {
+									junk = SSP1BUF;
+								}
+								++byteCount;
+								break;
+							case COMMAND_MOVE_B_FWD:
+								if (byteCount < 2) {
+									i2cRXData[byteCount] = SSP1BUF;
+									if (byteCount == 1) {
+										MoveMotorB(false, ((int)i2cRXData[0] << 8) + (int)i2cRXData[1]);
+										i2cCommand = COMMAND_NONE;
+									}
+								}
+								if (SSP1STATbits.BF) {
+									junk = SSP1BUF;
+								}
+								++byteCount;
+								break;
+							case COMMAND_MOVE_B_REV:
+								if (byteCount < 2) {
+									i2cRXData[byteCount] = SSP1BUF;
+									if (byteCount == 1) {
+										MoveMotorB(true, ((int)i2cRXData[0] << 8) + (int)i2cRXData[1]);
+										i2cCommand = COMMAND_NONE;
+									}
+								}
+								if (SSP1STATbits.BF) {
+									junk = SSP1BUF;
+								}
+								++byteCount;
+								break;
+							case COMMAND_MOVE_ALL_FWD:
+								if (byteCount < 2) {
+									i2cRXData[byteCount] = SSP1BUF;
+									if (byteCount == 1) {
+										MoveMotorA(false, ((int)i2cRXData[0] << 8) + (int)i2cRXData[1]);
+										MoveMotorB(false, ((int)i2cRXData[0] << 8) + (int)i2cRXData[1]);
+										i2cCommand = COMMAND_NONE;
+									}
+								}
+								if (SSP1STATbits.BF) {
+									junk = SSP1BUF;
+								}
+								++byteCount;
+								break;
+							case COMMAND_MOVE_ALL_REV:
+								if (byteCount < 2) {
+									i2cRXData[byteCount] = SSP1BUF;
+									if (byteCount == 1) {
+										MoveMotorA(true, ((int)i2cRXData[0] << 8) + (int)i2cRXData[1]);
+										MoveMotorB(true, ((int)i2cRXData[0] << 8) + (int)i2cRXData[1]);
+										i2cCommand = COMMAND_NONE;
+									}
+								}
+								if (SSP1STATbits.BF) {
+									junk = SSP1BUF;
+								}
+								++byteCount;
+								break;
+							case COMMAND_SET_ENC_SPEED:
+								if (byteCount == 0) {
+									encLimit = SSP1BUF;
+									i2cCommand = COMMAND_NONE;
+								}
+								if (SSP1STATbits.BF) {
+									junk = SSP1BUF;
+								}
+								++byteCount;
+								break;
+							case COMMAND_SET_I2C_ADD:
+								if (byteCount == 0) {
+									i2cRXData[0] = SSP1BUF;
+									if ((i2cRXData[0] < 0x03) || (i2cRXData[0] > 0x77)) {
+										// New address is from reserved
+										// address space. Ignore it.
+										i2cCommand = COMMAND_NONE;
+										++byteCount;
+										break;
+									}
+									// Set the live I2C address
+									SSP1ADD = i2cRXData[0] << 1;
+									// Save the I2C address to EEPROM
+									PIR2bits.EEIF = 0;
+									EECON1bits.WREN = 1;
+									EEADRL = EEPROM_I2C_ADDRESS;
+									EEDATL = i2cRXData[0];
+									EECON2 = 0x55;
+									EECON2 = 0xAA;
+									EECON1bits.WR = 1;
+									while (PIR2bits.EEIF == 0);
+									PIR2bits.EEIF = 0;
+									EECON1bits.WREN = 0;
+									i2cCommand = COMMAND_NONE;
+								}
+								if (SSP1STATbits.BF) {
+									junk = SSP1BUF;
+								}
+								++byteCount;
+								break;
+							default:
+								if (SSP1STATbits.BF) {
+									junk = SSP1BUF;
+								}
+								break;
+						}
+					}
+				}
 			}
 		}
-
-		SSP1CON1bits.CKP = 1;			// Release clock line
-	}
-
-	// Check for pin change events
-	if (INTCONbits.IOCIF) {
-		INTCONbits.IOCIF = 0;			// Clear the interrupt
-
-		if (IOCAFbits.IOCAF0) {
-			// Encoder for motor B
-			IOCAFbits.IOCAF0 = 0;			// Clear the interrupt
-			--remainingCountsB;
-		}
-
-		if (IOCAFbits.IOCAF1) {
-			// Encoder for motor A
-			IOCAFbits.IOCAF1 = 0;			// Clear the interrupt
-			--remainingCountsA;
-		}
+		// Release clock line
+		SSP1CON1bits.CKP = 1;
 	}
 }
-*/
+
 
 /**********************************************************************/
 /* Main Program                                                       */
