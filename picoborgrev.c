@@ -1,11 +1,23 @@
-// PIC code for the PicoBorg Reverse advanced robot controller
-// https://www.piborg.org/picoborgrev
-//
-// Rewritten for sdcc by Torsten Kurbad <beaglebone@tk-webart.de>
+/********************************************************************************/
+/*																				*/
+/*	PIC code for the PicoBorg Reverse advanced robot controller					*/
+/*		https://www.piborg.org/picoborgrev										*/
+/*																				*/
+/*	Rewritten for sdcc by Torsten Kurbad <beaglebone@tk-webart.de>				*/
+/*																				*/
+/********************************************************************************/
 
+/********************************************************************************/
+/* Global #defines																*/
+/********************************************************************************/
 
 // Avoid polluting the global namespace with aliases for each pin.
 #define NO_BIT_DEFINES
+
+
+/********************************************************************************/
+/* Includes																		*/
+/********************************************************************************/
 
 // PicoBorg Reverse uses a PIC16F1824 for I2C communication
 #include "pic14/pic16regs.h"
@@ -13,40 +25,47 @@
 
 #include "picoborgrev.h"
 
-// Set the configuration words:
+
+/********************************************************************************/
+/* PIC configuration															*/
+/********************************************************************************/
+
 __code unsigned short __at (_CONFIG1) configWord1 = (
-	_FOSC_INTOSC &
-	_WDTE_OFF &
-	_PWRTE_ON &
-	_MCLRE_ON &
-	_CP_OFF &
-	_CPD_OFF &
-	_BOREN_ON &
-	_CLKOUTEN_OFF &
-	_IESO_OFF &
-	_FCMEN_ON
+	_FOSC_INTOSC &				// Internal oscillator enabled
+	_WDTE_OFF &					// Watchdog timer is disabled
+	_PWRTE_ON &					// Power up timer is enabled
+	_MCLRE_ON &					// MCLR/RA3 pin function os MCLR
+	_CP_OFF &					// Program memory protection disabled
+	_CPD_OFF &					// Data memory protection disabled
+	_BOREN_ON &					// Brown-out reset enabled
+	_CLKOUTEN_OFF &				// Clock out disabled
+	_IESO_OFF &					// Internal/external switchover disabled
+	_FCMEN_ON					// Fail-Safe clock monitor enabled
 	);
 
 __code unsigned short __at (_CONFIG2) configWord2 = (
-	_WRT_OFF &
-	_PLLEN_ON &
-	_STVREN_ON &
-	_BORV_LO &
-	_DEBUG_OFF &
-	_LVP_OFF
+	_WRT_OFF &					// Flash memory write protection disabled
+	_PLLEN_ON &					// 4xPLL enabled
+	_STVREN_ON &				// Stack over- or underflow reset enabled
+	_BORV_LO &					// Brown-out reset voltage set to 1.9V
+	_DEBUG_OFF &				// In-circuit debugging disabled
+	_LVP_OFF					// Low-voltage programming disabled
 	);
 
-/**********************************************************************/
-/* System Functions                                                   */
-/**********************************************************************/
 
+/********************************************************************************/
+/* System Functions																*/
+/********************************************************************************/
+
+/* Configure the PIC's internal oswillator */
 void ConfigureOscillator(void) {
-	OSCCONbits.SCS = 0b0;	    // Set the clock to the CONFIG1 setting (internal oscillator)
-	OSCCONbits.IRCF = 0b1110;	    // Select the 8 MHz postscaler
-	OSCCONbits.SPLLEN = 1;	    // Enable the 4x PLL (overriden in CONFIG2 by PLLEN = ON)
-	OSCTUNEbits.TUN = 0b011111; // Set oscillator to max frequency
+	OSCCONbits.SCS = 0b0;		// Set the clock to the CONFIG1 setting (internal oscillator)
+	OSCCONbits.IRCF = 0b1110;	// Select the 8 MHz postscaler
+	OSCCONbits.SPLLEN = 1;		// Enable the 4x PLL (overriden in CONFIG2 by PLLEN = ON)
+	OSCTUNEbits.TUN = 0b011111;	// Set oscillator to max frequency
 }
 
+/* Delay processing for approximately 'ms' milliseconds */
 void Delay_ms(unsigned short ms) {
 	int u;
 	while (ms--) {
@@ -57,31 +76,47 @@ void Delay_ms(unsigned short ms) {
 }
 
 
-/**********************************************************************/
-/* User Global Variable Declaration                                   */
-/**********************************************************************/
+/********************************************************************************/
+/* User Global Variable Initialization											*/
+/********************************************************************************/
 
+// I2C address that was sent by the master
 unsigned char i2cAddress = 0x00;
+// I2C command that was sent by the master
 unsigned char i2cCommand = 0x00;
+// Array of data bytes received by the master
 unsigned char i2cRXData[I2C_MAX_LEN] = {0x00};
-char junk = 0x00;
+// Byte count for the data array
 int byteCount = 0;
+// Junk byte for excess/unnecessary reads
+char junk = 0x00;
+// Has a GET_... command been received by the master that is yet to be answered?
 bool readCommandPending = false;
 
+// Has the Emergency Power Off switch been tripped?
 bool epoTripped = false;
+// Should the Emergency Power Off switch be ignored?
 bool epoIgnored = false;
+// Communications failsafe counter
 int failsafeCounter = 0;
+// Is encoder mode active?
 bool encMode = false;
+// Is motor A moving?
 bool movingA = false;
+// Is motor B moving?
 bool movingB = false;
+// Maximum PWM duty cycle for encoder mode
 int encLimit = 255;
+// Remaining encoder ticks for motor A
 int remainingCountsA = 0;
+// Remaining encoder ticks for motor B
 int remainingCountsB = 0;
 
-/**********************************************************************/
-/* User Functions                                                     */
-/**********************************************************************/
+/********************************************************************************/
+/* User Functions																*/
+/********************************************************************************/
 
+/* I/O and Peripheral Initialization */
 void InitApp(void) {
 	unsigned char value;
 
@@ -168,10 +203,10 @@ void InitApp(void) {
 	SRCON0bits.SRLEN = 0;			// SR latch disabled
 	SRCON0bits.SRQEN = 0;			// SR latch output disabled
 	SRCON0bits.SRNQEN = 0;			// SR latch #output disabled
-	CM1CON0bits.C1ON = 0;			// Comparitor 1 disabled
-	CM1CON0bits.C1OE = 0;			// Comparitor 1 output disabled
-	CM2CON0bits.C2ON = 0;			// Comparitor 2 disabled
-	CM2CON0bits.C2OE = 0;			// Comparitor 2 output disabled
+	CM1CON0bits.C1ON = 0;			// Comparator 1 disabled
+	CM1CON0bits.C1OE = 0;			// Comparator 1 output disabled
+	CM2CON0bits.C2ON = 0;			// Comparator 2 disabled
+	CM2CON0bits.C2OE = 0;			// Comparator 2 output disabled
 	RCSTAbits.SPEN = 0;				// UART disabled
 
 	// Interrupts (global enable elsewhere)
@@ -200,15 +235,16 @@ void InitApp(void) {
 	}
 }
 
+/* Control movement of motor A */
 void SetMotorA(bool reverse, int pwm) {
 	// Check if the EPO has been tripped
-	if (epoTripped && !epoIgnored) {
+	if ((epoTripped == true) && (epoIgnored == false)) {
 		reverse = false;
 		pwm = 0;
 	}
 	// Work out the required settings
 	if (pwm > PWM_MAX) pwm = PWM_MAX;
-	if (reverse) {
+	if (reverse == true) {
 		pwm = PWM_MAX - pwm;			// PWM pulse width inverted for reverse
 		LATCbits.LATC2 = 1;				// Motor A:2 On
 	} else {
@@ -216,19 +252,21 @@ void SetMotorA(bool reverse, int pwm) {
 		LATCbits.LATC2 = 0;				// Motor A:2 Off
 	}
 	// Set Motor A:1 to the pulse width
-	CCPR2L = pwm >> 2;				// Set PWM 2 MSBs
-	CCP2CONbits.DC2B = pwm & 0b11;	// Set PWM 2 LSBs
+	CCPR2L = pwm >> 2;					// Set PWM 2 MSBs
+	CCP2CONbits.DC2B = pwm & 0b11;		// Set PWM 2 LSBs
 }
 
+
+/* Control movement of motor B */
 void SetMotorB(bool reverse, int pwm) {
 	// Check if the EPO has been tripped
-	if (epoTripped && !epoIgnored) {
+	if ((epoTripped == true) && (epoIgnored == false)) {
 		reverse = false;
 		pwm = 0;
 	}
 	// Work out the required settings
 	if (pwm > PWM_MAX) pwm = PWM_MAX;
-	if (reverse) {
+	if (reverse == true) {
 		pwm = PWM_MAX - pwm;			// PWM pulse width inverted for reverse
 		LATCbits.LATC4 = 1;				// Motor B:2 On
 	} else {
@@ -236,35 +274,37 @@ void SetMotorB(bool reverse, int pwm) {
 		LATCbits.LATC4 = 0;				// Motor B:2 Off
 	}
 	// Set Motor B:1 to the pulse width
-	CCPR1L = pwm >> 2;				// Set PWM 1 MSBs
-	CCP1CONbits.DC1B = pwm & 0b11;	// Set PWM 1 LSBs
+	CCPR1L = pwm >> 2;					// Set PWM 1 MSBs
+	CCP1CONbits.DC1B = pwm & 0b11;		// Set PWM 1 LSBs
 }
 
+/* Control movement of both motors */
 void SetAllMotors(bool reverse, int pwm) {
 	// Check if the EPO has been tripped
-	if (epoTripped && !epoIgnored) {
+	if ((epoTripped == true) && (epoIgnored == false)) {
 		reverse = false;
 		pwm = 0;
 	}
 	// Work out the required settings
 	if (pwm > PWM_MAX) pwm = PWM_MAX;
-	if (reverse) {
-		pwm = PWM_MAX - pwm;			// PWM pulse width inverted for reverse
+	if (reverse == true) {
+		pwm = PWM_MAX - pwm;				// PWM pulse width inverted for reverse
 		LATC = PORTC | (_LATC2 | _LATC4);	// Motor A:2 and B:2 On
 	} else {
 		// PWM pulse width is not inverted for forward
-		LATC = PORTC & ~(_LATC2 | _LATC4);	// Motor A:2 and B:2 On
+		LATC = PORTC & ~(_LATC2 | _LATC4);	// Motor A:2 and B:2 Off
 	}
 	// Wait until it is safe to change the pulse widths
-	PIR1bits.TMR2IF = 0;			// Clear Timer 2 interrupt flag
-	while (PIR1bits.TMR2IF == 0) ;	// Wait for Timer 2 to loop
+	PIR1bits.TMR2IF = 0;					// Clear Timer 2 interrupt flag
+	while (PIR1bits.TMR2IF == 0) ;			// Wait for Timer 2 to loop
 	// Set Motor A:1 and B:1 to the pulse width
-	CCPR2L = pwm >> 2;				// Set PWM 2 MSBs
-	CCPR1L = pwm >> 2;				// Set PWM 1 MSBs
-	CCP2CONbits.DC2B = pwm & 0b11;	// Set PWM 2 LSBs
-	CCP1CONbits.DC1B = pwm & 0b11;	// Set PWM 1 LSBs
+	CCPR2L = pwm >> 2;						// Set PWM 2 MSBs
+	CCPR1L = pwm >> 2;						// Set PWM 1 MSBs
+	CCP2CONbits.DC2B = pwm & 0b11;			// Set PWM 2 LSBs
+	CCP1CONbits.DC1B = pwm & 0b11;			// Set PWM 1 LSBs
 }
 
+/* Enable/disable encoder mode */
 void SetEncoderMode(bool enabled) {
 	// Disable any automatic routines
 	encMode = false;
@@ -276,16 +316,17 @@ void SetEncoderMode(bool enabled) {
 
 	// Set the correct mode
 	encMode = enabled;
-	if (encMode) {
-		INTCONbits.IOCIE = 1;			// Interrupts on change enabled
+	if (encMode == true) {
+		INTCONbits.IOCIE = 1;				// Interrupts on change enabled
 	} else {
-		INTCONbits.IOCIE = 0;			// Interrupts on change disabled
+		INTCONbits.IOCIE = 0;				// Interrupts on change disabled
 	}
 }
 
+/* Move motor A by 'count' encoder ticks */
 void MoveMotorA(bool reverse, int count) {
-	// Check we are in encoder mode before starting
-	if (!encMode) {
+	// Make sure we are in encoder mode before starting
+	if (encMode == false) {
 		return;
 	}
 
@@ -299,9 +340,10 @@ void MoveMotorA(bool reverse, int count) {
 	movingA = true;
 }
 
+/* Move motor A by 'count' encoder ticks */
 void MoveMotorB(bool reverse, int count) {
-	// Check we are in encoder mode before starting
-	if (!encMode) {
+	// Make sure we are in encoder mode before starting
+	if (encMode == false) {
 		return;
 	}
 
@@ -316,37 +358,35 @@ void MoveMotorB(bool reverse, int count) {
 }
 
 
-/**********************************************************************/
-/* Interrupt Service Routine                                          */
-/**********************************************************************/
+/********************************************************************************/
+/* Interrupt Service Routine													*/
+/********************************************************************************/
 
+/* ISR to process the I2C commands and encoder interrupts */
 void isr_i2c(void) __interrupt 0 {
-	// I2C event occured?
-	if (PIR1bits.SSP1IF) {
-		PIR1bits.SSP1IF = 0;
 
-		// Hold clock line
-		SSP1CON1bits.CKP = 0;
+	/* I2C interrupt processing */
 
-		if (SSP1STATbits.P) {
-			// * Stop condition *
+	if (PIR1bits.SSP1IF) {						// I2C event occured?
+		PIR1bits.SSP1IF = 0;					// Reset I2C event interrupt
+		SSP1CON1bits.CKP = 0;					// Hold clock line
+												//	(=clock stretching)
 
-			// Reset command, if no read command is pending
-			if (readCommandPending == false) {
-				i2cCommand = COMMAND_NONE;
+		if (SSP1STATbits.P) {					// I2C Stop bit received?
+			if (readCommandPending == false) {	// Is no GET_... command pending?
+				i2cCommand = COMMAND_NONE;		// Reset command
 			}
 
-			// Reset everything else
 			for (byteCount = 0; byteCount < I2C_MAX_LEN; ++byteCount) {
-				i2cRXData[byteCount] = 0x00;
+				i2cRXData[byteCount] = 0x00;	// Reset i2cRXData array unconditionally
 			}
-			byteCount = 0;
+			byteCount = 0;						// Reset data byte count unconditionally
 
-		} else {
+		} else {								// No I2C Stop bit received
 
-			if (!SSP1STATbits.D_NOT_A) {
-				if (SSP1STATbits.R_NOT_W) {
-					// * Master wants to read *
+			if (!SSP1STATbits.D_NOT_A) {		// Last byte sent by I2C master
+												//	was an address, not data
+				if (SSP1STATbits.R_NOT_W) {		// I2C master wants to receive data
 
 					// Send command byte back to the master
 					switch(i2cCommand) {
@@ -384,17 +424,16 @@ void isr_i2c(void) __interrupt 0 {
 							SSP1BUF = COMMAND_GET_ID;
 							break;
 						default:
+							// For unknown commands, send 0x00
 							SSP1BUF = I2C_DATA_NONE;
 							break;
 					}
-				} else {
-					// * Master wants to write *
-					i2cAddress = SSP1BUF;
-					SSP1CON1bits.CKP = 1;
+				} else {						// I2C master wants to send data
+					i2cAddress = SSP1BUF;		// Read I2C address sent by master
 				}
-			} else {
-				if (SSP1STATbits.R_NOT_W) {
-					// * Master wants to read *
+			} else {							// Last byte sent by I2C master
+												//	was data, not an address
+				if (SSP1STATbits.R_NOT_W) {		// I2C master wants to receive data
 
 					// Send data bytes to master
 					switch(i2cCommand) {
@@ -529,12 +568,12 @@ void isr_i2c(void) __interrupt 0 {
 							byteCount = 0;
 							break;
 					}
-				} else {
-					// * Master wants to write *
+				} else {						// I2C master wants to send data
 					if (i2cCommand == COMMAND_NONE) {
-						i2cCommand = SSP1BUF;
+												// If i2cCommand not (yet) set,
+						i2cCommand = SSP1BUF;	// get it from the I2C master
 
-						switch(i2cCommand) {
+						switch(i2cCommand) {	// For all GET_... commands...
 							case COMMAND_GET_LED:
 							case COMMAND_GET_A:
 							case COMMAND_GET_B:
@@ -546,9 +585,12 @@ void isr_i2c(void) __interrupt 0 {
 							case COMMAND_GET_ENC_MOVING:
 							case COMMAND_GET_ENC_SPEED:
 							case COMMAND_GET_ID:
+												//	... set the readCommandPending flag
 								readCommandPending = true;
 								break;
 							default:
+												// For all other commands
+												//	clear the readCommandPending flag
 								readCommandPending = false;
 								break;
 						}
@@ -842,41 +884,58 @@ void isr_i2c(void) __interrupt 0 {
 		// Release clock line
 		SSP1CON1bits.CKP = 1;
 	}
+
+	/* Encoder interrupt processing */
+
+	if (INTCONbits.IOCIF) {					// Pin change event occured?
+		INTCONbits.IOCIF = 0;				// Clear the pin change interrupt
+		if (IOCAFbits.IOCAF0) {				// Encoder for motor B moved one tick
+			IOCAFbits.IOCAF0 = 0;			// Clear the encoder interrupt
+			--remainingCountsB;				// Reduce remaining ticks for motor B
+		}
+		if (IOCAFbits.IOCAF1) {				// Encoder for motor A moved one tick
+			IOCAFbits.IOCAF1 = 0;			// Clear the encoder interrupt
+			--remainingCountsA;				// Reduce remaining ticks for motor A
+		}
+	}
 }
 
 
-/**********************************************************************/
-/* Main Program                                                       */
-/**********************************************************************/
+/********************************************************************************/
+/* Main Program																	*/
+/********************************************************************************/
 
+/* Main program */
 void main(void) {
-	// Configure the oscillator for the device
+	// Configure the PIC's oscillator
 	ConfigureOscillator();
 
-	// Initialize I/O and Peripherals for application
+	// Initialize I/O and peripherals for I2C mode
 	InitApp();
 
-	// Brief LED pulse
-	LATAbits.LATA4 = 0;		// LED On
+	// 0.5 second LED pulse to say 'Hello'
+	LATAbits.LATA4 = 0;					// LED On
 	Delay_ms(500);
-	LATAbits.LATA4 = 1;		// LED Off
-	
+	LATAbits.LATA4 = 1;					// LED Off
+
 	// Clear the I2C buffer
 	do {
 		PIR1bits.SSP1IF = 0;			// Clear the interrupt
 		junk = SSP1BUF;					// Discard the transmitted byte
 		SSP1CON1bits.CKP = 1;			// Release clock line
-	} while (SSP1STATbits.BF);
+	} while (SSP1STATbits.BF);			// While there is a byte in the I2C buffer
 	
 	// Main loop
 	INTCONbits.GIE = 1;					// Enable interrupts
-	failsafeCounter = 0;
-	while (1) {
+	failsafeCounter = 0;				// Reset failsafe counter
+
+	while (1) {							// Loop forever
+
 		// Check the communications failsafe
 		if (PIR3bits.TMR4IF) {
-			PIR3bits.TMR4IF = 0;			// Clear the interrupt
+			PIR3bits.TMR4IF = 0;		// Clear the interrupt
 
-			++failsafeCounter;				// Increment the counter
+			++failsafeCounter;			// Increment the counter
 			if (failsafeCounter > FAILSAFE_LIMIT) {
 				// Failsafe timeout exceeded, presume that communications have failed
 				SetAllMotors(false, 0);
@@ -892,23 +951,23 @@ void main(void) {
 		}
 
 		// Run the encoder loop
-		if (encMode) {
+		if (encMode == true) {			// If encoder mode is enabled
 			if (movingA && (remainingCountsA <= 0)) {
-				SetMotorA(false, 0);
+				SetMotorA(false, 0);	// Stop motor A if encoder ticks count reached
 				movingA = false;
 			}
 			if (movingB && (remainingCountsB <= 0)) {
-				SetMotorB(false, 0);
+				SetMotorB(false, 0);	// Stop motor B if encoder ticks count reached
 				movingB = false;
 			}
 		}
 
-		if (!epoIgnored) {
+		if (epoIgnored == false) {		// If the EPO is not ignored
 			// Check if the EPO has been tripped
 			if (!epoTripped && (PORTAbits.RA5 == 1)) {
 				epoTripped = true;
-				SetMotorA(false , 0);
-				SetMotorB(false , 0);
+				SetMotorA(false , 0);	// Immediately stop motor A
+				SetMotorB(false , 0);	//	and B
 				movingA = false;
 				movingB = false;
 			}

@@ -1,24 +1,40 @@
+/********************************************************************************/
+/*																				*/
+/*	PIC code for the PicoBorg Reverse advanced robot controller					*/
+/*		https://www.piborg.org/picoborgrev										*/
+/*																				*/
+/*	Rewritten for sdcc by Torsten Kurbad <beaglebone@tk-webart.de>				*/
+/*																				*/
+/********************************************************************************/
+
+/********************************************************************************/
+/* Type definitions                                                           	*/
+/********************************************************************************/
+
 typedef enum { false, true } bool;
 
-/******************************************************************************/
-/* System #define Macros                                                  */
-/******************************************************************************/
+/********************************************************************************/
+/* System #define Macros														*/
+/********************************************************************************/
 
-#define SYS_FREQ                32000000L
-#define INSTR_PER_MS            (SYS_FREQ / 2000L)
-#define LOOPS_PER_MS            (INSTR_PER_MS / 14U)
+#define SYS_FREQ				32000000L
+#define INSTR_PER_MS			(SYS_FREQ / 2000L)
+#define LOOPS_PER_MS			(INSTR_PER_MS / 14U)	// For delay loop
 
-/******************************************************************************/
-/* User Level #define Macros                                                  */
-/******************************************************************************/
+/********************************************************************************/
+/* User Level #define Macros													*/
+/********************************************************************************/
 
-#define PWM_MAX					(255)
-#define I2C_MAX_LEN				(2)
+#define PWM_MAX					(255)	// Maximum PWM duty cycle
+#define I2C_MAX_LEN				(2)		// Maximum length of I2C data bytes
+										//  Note, that this excludes address and
+										//  command bytes, which are always sent
+										//  by the I2C master.
 #define FAILSAFE_LIMIT			(31)	// Approximately 0.25 seconds at a 122 Hz timer
 
-#define I2C_ID_PICOBORG_REV		(0x15)
+#define I2C_ID_PICOBORG_REV		(0x15)	// Board identifier
 
-#define COMMAND_NONE            (0)     // Initialization value
+#define COMMAND_NONE			(0)		// 'Empty' command
 
 #define COMMAND_SET_LED			(1)		// Set the LED status
 #define COMMAND_GET_LED			(2)		// Get the LED status
@@ -62,49 +78,73 @@ typedef enum { false, true } bool;
 
 #define I2C_DATA_NONE           (0x00)  // Empty data byte
 
-/******************************************************************************/
-/* Global variables                                                           */
-/******************************************************************************/
+/********************************************************************************/
+/* Global variables																*/
+/********************************************************************************/
 
+// I2C address that was sent by the master
 extern unsigned char i2cAddress;
+// I2C command that was sent by the master
 extern unsigned char i2cCommand;
+// Array of data bytes received by the master
 extern unsigned char i2cRXData[I2C_MAX_LEN];
-extern char junk;
+// Byte count for the data array
 extern int byteCount;
+// Junk byte for excess/unnecessary reads
+extern char junk;
+// Has a GET_... command been received by the master that is yet to be answered?
 extern bool readCommandPending;
 
+// Has the Emergency Power Off switch been tripped?
 extern bool epoTripped;
+// Should the Emergency Power Off switch be ignored?
 extern bool epoIgnored;
+// Communications failsafe counter
 extern int failsafeCounter;
+// Is encoder mode active?
 extern bool encMode;
+// Is motor A moving?
 extern bool movingA;
+// Is motor B moving?
 extern bool movingB;
+// Maximum PWM duty cycle for encoder mode
 extern int encLimit;
+// Remaining encoder ticks for motor A
 extern int remainingCountsA;
+// Remaining encoder ticks for motor B
 extern int remainingCountsB;
 
-/******************************************************************************/
-/* System Function Prototypes                                                 */
-/******************************************************************************/
+/********************************************************************************/
+/* System Function Prototypes													*/
+/********************************************************************************/
 
+/* Configure the PIC's internal oswillator */
 void ConfigureOscillator(void);
+/* Delay processing for approximately 'ms' milliseconds */
 void Delay_ms(unsigned short ms);
 
-/**********************************************************************/
-/* Interrupt Service Routine                                          */
-/**********************************************************************/
+/********************************************************************************/
+/* Interrupt Service Routine													*/
+/********************************************************************************/
 
+/* ISR to process the I2C commands and encoder interrupts */
 void isr_i2c(void) __interrupt 0;
 
-/******************************************************************************/
-/* User Function Prototypes                                                   */
-/******************************************************************************/
+/********************************************************************************/
+/* User Function Prototypes														*/
+/********************************************************************************/
 
-void InitApp(void);         /* I/O and Peripheral Initialization */
+/* I/O and peripheral Initialization */
+void InitApp(void);
+/* Control movement of motor A */
 void SetMotorA(bool reverse, int pwm);
+/* Control movement of motor B */
 void SetMotorB(bool reverse, int pwm);
+/* Control movement of both motors */
 void SetAllMotors(bool reverse, int pwm);
+/* Enable/disable encoder mode */
 void SetEncoderMode(bool enabled);
+/* Move motor A by 'count' encoder ticks */
 void MoveMotorA(bool reverse, int count);
+/* Move motor B by 'count' encoder ticks */
 void MoveMotorB(bool reverse, int count);
-void ProcessI2C(int len);
