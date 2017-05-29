@@ -71,7 +71,7 @@ extern unsigned char i2cCommand;
 extern unsigned char i2cRXData[I2C_MAX_LEN];
 extern char junk;
 extern int byteCount;
-extern bool finished;
+extern bool readCommandPending;
 
 extern bool epoTripped;
 extern bool epoIgnored;

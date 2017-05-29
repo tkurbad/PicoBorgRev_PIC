@@ -66,7 +66,7 @@ unsigned char i2cCommand = 0x00;
 unsigned char i2cRXData[I2C_MAX_LEN] = {0x00};
 char junk = 0x00;
 int byteCount = 0;
-bool finished = false;
+bool readCommandPending = false;
 
 bool epoTripped = false;
 bool epoIgnored = false;
@@ -329,9 +329,14 @@ void isr_i2c(void) __interrupt 0 {
 		SSP1CON1bits.CKP = 0;
 
 		if (SSP1STATbits.P) {
+			// * Stop condition *
 
-			// Stop - Reset everything
-			i2cCommand = COMMAND_NONE;
+			// Reset command, if no read command is pending
+			if (readCommandPending == false) {
+				i2cCommand = COMMAND_NONE;
+			}
+
+			// Reset everything else
 			for (byteCount = 0; byteCount < I2C_MAX_LEN; ++byteCount) {
 				i2cRXData[byteCount] = 0x00;
 			}
@@ -401,6 +406,7 @@ void isr_i2c(void) __interrupt 0 {
 								SSP1BUF = COMMAND_VALUE_ON;
 							}
 							i2cCommand = COMMAND_NONE;
+							readCommandPending = false;
 							break;
 						case COMMAND_GET_A:
 							if (byteCount == 0) {
@@ -419,6 +425,7 @@ void isr_i2c(void) __interrupt 0 {
 									SSP1BUF = PWM_MAX - (char)(0xFF & ((CCPR2L << 2) | CCP2CONbits.DC2B));
 								}
 								i2cCommand = COMMAND_NONE;
+								readCommandPending = false;
 								byteCount = 0;
 							}
 							break;
@@ -439,6 +446,7 @@ void isr_i2c(void) __interrupt 0 {
 									SSP1BUF = PWM_MAX - (char)(0xFF & ((CCPR1L << 2) | CCP1CONbits.DC1B));
 								}
 								i2cCommand = COMMAND_NONE;
+								readCommandPending = false;
 								byteCount = 0;
 							}
 							break;
@@ -450,6 +458,7 @@ void isr_i2c(void) __interrupt 0 {
 								SSP1BUF = COMMAND_VALUE_OFF;
 							}
 							i2cCommand = COMMAND_NONE;
+							readCommandPending = false;
 							break;
 						case COMMAND_GET_EPO_IGNORE:
 							// EPO ignore flag is one data byte
@@ -459,6 +468,7 @@ void isr_i2c(void) __interrupt 0 {
 								SSP1BUF = COMMAND_VALUE_OFF;
 							}
 							i2cCommand = COMMAND_NONE;
+							readCommandPending = false;
 							break;
 						case COMMAND_GET_DRIVE_FAULT:
 							// Drive fault flag is one data byte
@@ -468,6 +478,7 @@ void isr_i2c(void) __interrupt 0 {
 								SSP1BUF = COMMAND_VALUE_ON;
 							}
 							i2cCommand = COMMAND_NONE;
+							readCommandPending = false;
 							break;
 						case COMMAND_GET_FAILSAFE:
 							// Failsafe flag is one data byte
@@ -477,6 +488,7 @@ void isr_i2c(void) __interrupt 0 {
 								SSP1BUF = COMMAND_VALUE_ON;
 							}
 							i2cCommand = COMMAND_NONE;
+							readCommandPending = false;
 							break;
 						case COMMAND_GET_ENC_MODE:
 							// Encoder mode flag is one data byte
@@ -486,6 +498,7 @@ void isr_i2c(void) __interrupt 0 {
 								SSP1BUF = COMMAND_VALUE_OFF;
 							}
 							i2cCommand = COMMAND_NONE;
+							readCommandPending = false;
 							break;
 						case COMMAND_GET_ENC_MOVING:
 							// Encoder moving flag is one data byte
@@ -495,20 +508,24 @@ void isr_i2c(void) __interrupt 0 {
 								SSP1BUF = COMMAND_VALUE_OFF;
 							}
 							i2cCommand = COMMAND_NONE;
+							readCommandPending = false;
 							break;
 						case COMMAND_GET_ENC_SPEED:
 							// Encoder speed is one data byte
 							SSP1BUF = encLimit;
 							i2cCommand = COMMAND_NONE;
+							readCommandPending = false;
 							break;
 						case COMMAND_GET_ID:
 							// ID is one data byte
 							SSP1BUF = I2C_ID_PICOBORG_REV;
 							i2cCommand = COMMAND_NONE;
+							readCommandPending = false;
 							break;
 						default:
 							// No valid command given. Send empty reply.
 							SSP1BUF = I2C_DATA_NONE;
+							readCommandPending = false;
 							byteCount = 0;
 							break;
 					}
@@ -516,6 +533,26 @@ void isr_i2c(void) __interrupt 0 {
 					// * Master wants to write *
 					if (i2cCommand == COMMAND_NONE) {
 						i2cCommand = SSP1BUF;
+
+						switch(i2cCommand) {
+							case COMMAND_GET_LED:
+							case COMMAND_GET_A:
+							case COMMAND_GET_B:
+							case COMMAND_GET_EPO:
+							case COMMAND_GET_EPO_IGNORE:
+							case COMMAND_GET_DRIVE_FAULT:
+							case COMMAND_GET_FAILSAFE:
+							case COMMAND_GET_ENC_MODE:
+							case COMMAND_GET_ENC_MOVING:
+							case COMMAND_GET_ENC_SPEED:
+							case COMMAND_GET_ID:
+								readCommandPending = true;
+								break;
+							default:
+								readCommandPending = false;
+								break;
+						}
+						
 					} else {
 						if (byteCount > I2C_MAX_LEN) {
 							byteCount = I2C_MAX_LEN;
