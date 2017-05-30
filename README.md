@@ -15,7 +15,7 @@ This problem occurs when the PicoBorg Reverse is connected to a Beaglebone Blue 
 A cheap and simple logic analyzer https://www.amazon.de/gp/product/B01MUFRHQ2 revealed two problems with the existing code:
 
 * I²C clock stretching wasn't properly implemented.
-* For all `GET_...` commands, i.e. commands where the bus master reads from the PIC, the output array was cleared *before* being sent.
+* For all `GET_...` commands, i.e. commands where the bus master reads from the PIC, the output array was cleared *before* being sent back to the I²C master.
 
 The present code has a completely rewritten interrupt service routine that eliminates both issues.
 
