@@ -690,11 +690,12 @@ void isr_i2c(void) __interrupt 0 {
 								}
 								++byteCount;
 								break;
-							case COMMAND_ALL_OFF:
+							case COMMAND_ALL_OFF:				// Turning everything off
+																//	needs one data byte
 								if (byteCount == 0) {
-									SetAllMotors(false, 0);
-									LATAbits.LATA4 = 1;		// LED Off
-									movingA = false;
+									SetAllMotors(false, 0);		// Motors off
+									LATAbits.LATA4 = 1;			// LED off
+									movingA = false;			// Reset 'moving' flags
 									movingB = false;
 									i2cCommand = COMMAND_NONE;	// Reset, clear buffer, ...
 								}
@@ -703,9 +704,10 @@ void isr_i2c(void) __interrupt 0 {
 								}
 								++byteCount;
 								break;
-							case COMMAND_RESET_EPO:
+							case COMMAND_RESET_EPO:				// Resetting the EPO switch
+																//	needs one data byte
 								if (byteCount == 0) {
-									epoTripped = false;
+									epoTripped = false;			// Reset EPO tripped flag
 									i2cCommand = COMMAND_NONE;	// Reset, clear buffer, ...
 								}
 								if (SSP1STATbits.BF) {
@@ -713,13 +715,14 @@ void isr_i2c(void) __interrupt 0 {
 								}
 								++byteCount;
 								break;
-							case COMMAND_SET_EPO_IGNORE:
+							case COMMAND_SET_EPO_IGNORE:		// Setting the EPO ignore flag
+																//	needs one data byte
 								if (byteCount == 0) {
 									i2cRXData[0] = SSP1BUF;
 									if (i2cRXData[0] == COMMAND_VALUE_OFF) {
-										epoIgnored = false;
+										epoIgnored = false;		// Do not ignore the EPO
 									} else {
-										epoIgnored = true;
+										epoIgnored = true;		// Ignore the EPO
 									}
 									i2cCommand = COMMAND_NONE;	// Reset, clear buffer, ...
 								}
@@ -728,9 +731,11 @@ void isr_i2c(void) __interrupt 0 {
 								}
 								++byteCount;
 								break;
-							case COMMAND_SET_ALL_FWD:
+							case COMMAND_SET_ALL_FWD:			// Running both motors forward
+																//	needs one data byte
 								if (byteCount == 0) {
-									i2cRXData[0] = SSP1BUF;
+									i2cRXData[0] = SSP1BUF;		// Run both motors forward
+																//	at desired speed
 									SetAllMotors(false, (int)i2cRXData[0]);
 									i2cCommand = COMMAND_NONE;	// Reset, clear buffer, ...
 								}
@@ -739,9 +744,11 @@ void isr_i2c(void) __interrupt 0 {
 								}
 								++byteCount;
 								break;
-							case COMMAND_SET_ALL_REV:
+							case COMMAND_SET_ALL_REV:			// Running both motors in
+																//	reverse needs one data byte
 								if (byteCount == 0) {
-									i2cRXData[0] = SSP1BUF;
+									i2cRXData[0] = SSP1BUF;		// Run both motors in reverse
+																//	at desired speed
 									SetAllMotors(true, (int)i2cRXData[0]);
 									i2cCommand = COMMAND_NONE;	// Reset, clear buffer, ...
 								}
@@ -750,15 +757,17 @@ void isr_i2c(void) __interrupt 0 {
 								}
 								++byteCount;
 								break;
-							case COMMAND_SET_FAILSAFE:
+							case COMMAND_SET_FAILSAFE:			// Setting the fail safe flag
+																//	needs one data byte
 								if (byteCount == 0) {
 									i2cRXData[0] = SSP1BUF;
 									if (i2cRXData[0] == COMMAND_VALUE_OFF) {
-										T4CONbits.TMR4ON = 0;			// Timer 4 disabled
+										T4CONbits.TMR4ON = 0;	// Disable timer 4
+																//	(fail safe timer)
 									} else {
-										T4CONbits.TMR4ON = 1;			// Timer 4 enabled
+										T4CONbits.TMR4ON = 1;	// Enable timer 4
 									}
-									PIR3bits.TMR4IF = 0;			// Clear Timer 4 interrupt flag
+									PIR3bits.TMR4IF = 0;		// Clear timer 4 interrupt flag
 									i2cCommand = COMMAND_NONE;	// Reset, clear buffer, ...
 								}
 								if (SSP1STATbits.BF) {
@@ -766,13 +775,14 @@ void isr_i2c(void) __interrupt 0 {
 								}
 								++byteCount;
 								break;
-							case COMMAND_SET_ENC_MODE:
+							case COMMAND_SET_ENC_MODE:			// Turning encoder mode on/off
+																//	needs one data byte
 								if (byteCount == 0) {
 									i2cRXData[0] = SSP1BUF;
 									if (i2cRXData[0] == COMMAND_VALUE_OFF) {
-										SetEncoderMode(false);
+										SetEncoderMode(false);	// Turn encoder mode off
 									} else {
-										SetEncoderMode(true);
+										SetEncoderMode(true);	// Turn encoder mode on
 									}
 									i2cCommand = COMMAND_NONE;	// Reset, clear buffer, ...
 								}
@@ -781,11 +791,24 @@ void isr_i2c(void) __interrupt 0 {
 								}
 								++byteCount;
 								break;
-							case COMMAND_MOVE_A_FWD:
-								if (byteCount < 2) {
-									i2cRXData[byteCount] = SSP1BUF;
-									if (byteCount == 1) {
+							case COMMAND_MOVE_A_FWD:			// Moving motor A forward
+																//  by a given number of
+																//	encoder steps
+																//	needs two data bytes
+								if (byteCount < I2C_MAX_LEN) {	// While less then I2C_MAX_LEN
+																//	bytes have been received...
+									i2cRXData[byteCount] = SSP1BUF;	// ... read one byte per
+																	//	cycle from the master
+																	//	and store it in the
+																	//	rx array
+									if (byteCount == 1) {		// As soon as the second byte
+																//	has been received
+																//	move motor A forward by
+																//	'word' encoder ticks,
+																//	where 'word' is composed of
+																//	the two bytes received earlier
 										MoveMotorA(false, ((int)i2cRXData[0] << 8) + (int)i2cRXData[1]);
+																// Afterwards, reset, clear buffer, ...
 										i2cCommand = COMMAND_NONE;
 									}
 								}
@@ -794,11 +817,20 @@ void isr_i2c(void) __interrupt 0 {
 								}
 								++byteCount;
 								break;
-							case COMMAND_MOVE_A_REV:
-								if (byteCount < 2) {
+							case COMMAND_MOVE_A_REV:			// Moving motor A in reverse
+																//  by a given number of
+																//	encoder steps
+																//	needs two data bytes
+								if (byteCount < I2C_MAX_LEN) {	// Read two bytes from the
+																//	master
 									i2cRXData[byteCount] = SSP1BUF;
 									if (byteCount == 1) {
+																// Move motor A in reverse
+																//	by the given number of
+																//	encoder ticks
+																//	(cf. COMMAND_MOVE_A_FWD)
 										MoveMotorA(true, ((int)i2cRXData[0] << 8) + (int)i2cRXData[1]);
+																// Reset, clear buffer, ...
 										i2cCommand = COMMAND_NONE;
 									}
 								}
@@ -807,11 +839,19 @@ void isr_i2c(void) __interrupt 0 {
 								}
 								++byteCount;
 								break;
-							case COMMAND_MOVE_B_FWD:
-								if (byteCount < 2) {
+							case COMMAND_MOVE_B_FWD:			// Moving motor B forward
+																//  by a given number of
+																//	encoder steps
+																//	needs two data bytes
+								if (byteCount < I2C_MAX_LEN) {	// Read two bytes from the
+																//	master
 									i2cRXData[byteCount] = SSP1BUF;
 									if (byteCount == 1) {
+																// Move motor B forward
+																//	by the given number of
+																//	encoder ticks
 										MoveMotorB(false, ((int)i2cRXData[0] << 8) + (int)i2cRXData[1]);
+																// Reset, clear buffer, ...
 										i2cCommand = COMMAND_NONE;
 									}
 								}
@@ -820,11 +860,19 @@ void isr_i2c(void) __interrupt 0 {
 								}
 								++byteCount;
 								break;
-							case COMMAND_MOVE_B_REV:
-								if (byteCount < 2) {
+							case COMMAND_MOVE_B_REV:			// Moving motor B in reverse
+																//  by a given number of
+																//	encoder steps
+																//	needs two data bytes
+								if (byteCount < I2C_MAX_LEN) {	// Read two bytes from the
+																//	master
 									i2cRXData[byteCount] = SSP1BUF;
 									if (byteCount == 1) {
+																// Move motor B in reverse
+																//	by the given number of
+																//	encoder ticks
 										MoveMotorB(true, ((int)i2cRXData[0] << 8) + (int)i2cRXData[1]);
+																// Reset, clear buffer, ...
 										i2cCommand = COMMAND_NONE;
 									}
 								}
@@ -833,12 +881,20 @@ void isr_i2c(void) __interrupt 0 {
 								}
 								++byteCount;
 								break;
-							case COMMAND_MOVE_ALL_FWD:
-								if (byteCount < 2) {
+							case COMMAND_MOVE_ALL_FWD:			// Moving both motors forward
+																//  by a given number of
+																//	encoder steps
+																//	needs two data bytes
+								if (byteCount < I2C_MAX_LEN) {	// Read two bytes from the
+																//	master
 									i2cRXData[byteCount] = SSP1BUF;
 									if (byteCount == 1) {
+																// Move both motors forward
+																//	by the given number of
+																//	encoder ticks
 										MoveMotorA(false, ((int)i2cRXData[0] << 8) + (int)i2cRXData[1]);
 										MoveMotorB(false, ((int)i2cRXData[0] << 8) + (int)i2cRXData[1]);
+																// Reset, clear buffer, ...
 										i2cCommand = COMMAND_NONE;
 									}
 								}
@@ -847,12 +903,20 @@ void isr_i2c(void) __interrupt 0 {
 								}
 								++byteCount;
 								break;
-							case COMMAND_MOVE_ALL_REV:
-								if (byteCount < 2) {
+							case COMMAND_MOVE_ALL_REV:			// Moving both motors in reverse
+																//  by a given number of
+																//	encoder steps
+																//	needs two data bytes
+								if (byteCount < I2C_MAX_LEN) {	// Read two bytes from the
+																//	master
 									i2cRXData[byteCount] = SSP1BUF;
 									if (byteCount == 1) {
+																// Move both motors in reverse
+																//	by the given number of
+																//	encoder ticks
 										MoveMotorA(true, ((int)i2cRXData[0] << 8) + (int)i2cRXData[1]);
 										MoveMotorB(true, ((int)i2cRXData[0] << 8) + (int)i2cRXData[1]);
+																// Reset, clear buffer, ...
 										i2cCommand = COMMAND_NONE;
 									}
 								}
@@ -861,9 +925,10 @@ void isr_i2c(void) __interrupt 0 {
 								}
 								++byteCount;
 								break;
-							case COMMAND_SET_ENC_SPEED:
+							case COMMAND_SET_ENC_SPEED:			// Setting encoder speed
+																//	needs one data byte
 								if (byteCount == 0) {
-									encLimit = SSP1BUF;
+									encLimit = SSP1BUF;			// Set encoder speed
 									i2cCommand = COMMAND_NONE;	// Reset, clear buffer, ...
 								}
 								if (SSP1STATbits.BF) {
@@ -871,9 +936,10 @@ void isr_i2c(void) __interrupt 0 {
 								}
 								++byteCount;
 								break;
-							case COMMAND_SET_I2C_ADD:
+							case COMMAND_SET_I2C_ADD:			// Setting a new I2C address
+																//	needs one data byte
 								if (byteCount == 0) {
-									i2cRXData[0] = SSP1BUF;
+									i2cRXData[0] = SSP1BUF;		// Get new address from master
 									if ((i2cRXData[0] < 0x03) || (i2cRXData[0] > 0x77)) {
 										/* New address is from reserved
 										 * address space. Ignore it.
@@ -893,16 +959,16 @@ void isr_i2c(void) __interrupt 0 {
 									while (PIR2bits.EEIF == 0);
 									PIR2bits.EEIF = 0;
 									EECON1bits.WREN = 0;
-									i2cCommand = COMMAND_NONE;		// Reset, clear buffer, ...
+									i2cCommand = COMMAND_NONE;	// Reset, clear buffer, ...
 								}
 								if (SSP1STATbits.BF) {
 									junk = SSP1BUF;
 								}
 								++byteCount;
 								break;
-							default:								// No valid command received
-								if (SSP1STATbits.BF) {				// Just clear the buffer
-									junk = SSP1BUF;
+							default:							// No valid command received
+								if (SSP1STATbits.BF) {			// Just clear the buffer
+									junk = SSP1BUF;				//	if necessary
 								}
 								break;
 						}
@@ -910,8 +976,8 @@ void isr_i2c(void) __interrupt 0 {
 				}
 			}
 		}
-		// Release clock line
-		SSP1CON1bits.CKP = 1;
+		SSP1CON1bits.CKP = 1;				// Release clock line
+											//	(clock stretching ends)
 	}
 
 	/* Encoder interrupt processing */
