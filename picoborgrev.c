@@ -386,10 +386,14 @@ void isr_i2c(void) __interrupt 0 {
 
 			if (!SSP1STATbits.D_NOT_A) {		// Last byte sent by I2C master
 												//	was an address, not data
-				if (SSP1STATbits.R_NOT_W) {		// I2C master wants to receive data
+				if (SSP1STATbits.R_NOT_W) {		// I2C master wants to receive data,
+												//  i.e. sends a GET_... command
 
-					// Send command byte back to the master
 					switch(i2cCommand) {
+						// A GET_... command has been initiated by the master.
+						// First step: Send command byte for valid GET_...
+						//	commands back to the
+						//	I2C master
 						case COMMAND_GET_LED:
 							SSP1BUF = COMMAND_GET_LED;
 							break;
@@ -428,57 +432,70 @@ void isr_i2c(void) __interrupt 0 {
 							SSP1BUF = I2C_DATA_NONE;
 							break;
 					}
-				} else {						// I2C master wants to send data
-					i2cAddress = SSP1BUF;		// Read I2C address sent by master
+				} else {										// I2C master wants to send data
+					i2cAddress = SSP1BUF;						// Read I2C address sent by master
 				}
-			} else {							// Last byte sent by I2C master
-												//	was data, not an address
-				if (SSP1STATbits.R_NOT_W) {		// I2C master wants to receive data
+			} else {											// Last byte sent by I2C master
+																//	was data, not an address
+				if (SSP1STATbits.R_NOT_W) {						// I2C master wants to receive data,
+																//  i.e. sends a GET_... command.
 
-					// Send data bytes to master
 					switch(i2cCommand) {
-						case COMMAND_GET_LED:
-							// LED status is one data byte
-							if (PORTAbits.RA4 == 1) {
-								SSP1BUF = COMMAND_VALUE_OFF;
-							} else {
+						/* A GET_... command has been initiated by the master.
+						 * Second / third step: Send data byte(s) for valid GET_...
+						 *	commands back to the
+						 *	I2C master
+						 */
+						case COMMAND_GET_LED:					// LED status yields one data byte
+							if (PORTAbits.RA4 == 1) {			// LED is off
+								SSP1BUF = COMMAND_VALUE_OFF;	// Fill SSP1BUF with
+																//	the byte value for 'off'.
+																// I2C master will then
+																//	read from this buffer.
+							} else {							// LED is on
 								SSP1BUF = COMMAND_VALUE_ON;
 							}
-							i2cCommand = COMMAND_NONE;
-							readCommandPending = false;
-							break;
-						case COMMAND_GET_A:
-							if (byteCount == 0) {
-								// First data byte denotes direction
-								if (PORTCbits.RC2 == 0) {
+							i2cCommand = COMMAND_NONE;			// Reset I2C command
+							readCommandPending = false;			// GET_... command finished
+							break;								// Done with this cycle
+						case COMMAND_GET_A:						// Motor status yields two data bytes
+							if (byteCount == 0) {				// First cycle?
+																// First data byte represents direction
+								if (PORTCbits.RC2 == 0) {		// Motor A forward?
+																// Send byte value for 'forward'
 									SSP1BUF = COMMAND_VALUE_FWD;
-								} else {
+								} else {						// Motor A reverse?
+																// Send byte value for 'reverse'
 									SSP1BUF = COMMAND_VALUE_REV;
 								}
-								++byteCount;
-							} else {
-								// Second data byte denotes PWM value
-								if (PORTCbits.RC2 == 0) {
+								++byteCount;					// Increase byte counter
+							} else {							// Second cycle?
+																// Second data byte represents
+																//	PWM value
+								if (PORTCbits.RC2 == 0) {		// Motor A forward?
+																// Send PWM value
 									SSP1BUF = (char)(0xFF & ((CCPR2L << 2) | CCP2CONbits.DC2B));
-								} else {
+								} else {						// Motor A reverse?
+																// Send inverse PWM value
 									SSP1BUF = PWM_MAX - (char)(0xFF & ((CCPR2L << 2) | CCP2CONbits.DC2B));
 								}
-								i2cCommand = COMMAND_NONE;
-								readCommandPending = false;
-								byteCount = 0;
+								i2cCommand = COMMAND_NONE;		// After the second byte,
+																//	reset I2C command,
+								readCommandPending = false;		//	the GET_... command pending
+																//	flag, and
+								byteCount = 0;					//	the byte counter
 							}
-							break;
-						case COMMAND_GET_B:
+							break;								// Done with this cycle
+						case COMMAND_GET_B:						// Motor status yields two data bytes
+																// (cf. COMMAND_GET_A)
 							if (byteCount == 0) {
-								// First data byte denotes direction
-								if (PORTCbits.RC4 == 0) {
+								if (PORTCbits.RC4 == 0) {		// Motor B forward?
 									SSP1BUF = COMMAND_VALUE_FWD;
-								} else {
+								} else {						// Motor B reverse?
 									SSP1BUF = COMMAND_VALUE_REV;
 								}
 								++byteCount;
 							} else {
-								// Second data byte denotes PWM value
 								if (PORTCbits.RC4 == 0) {
 									SSP1BUF = (char)(0xFF & ((CCPR1L << 2) | CCP1CONbits.DC1B));
 								} else {
@@ -489,8 +506,7 @@ void isr_i2c(void) __interrupt 0 {
 								byteCount = 0;
 							}
 							break;
-						case COMMAND_GET_EPO:
-							// EPO tripped flag is one data byte
+						case COMMAND_GET_EPO:					// EPO tripped flag yields one data byte
 							if (epoTripped) {
 								SSP1BUF = COMMAND_VALUE_ON;
 							} else {
@@ -499,8 +515,7 @@ void isr_i2c(void) __interrupt 0 {
 							i2cCommand = COMMAND_NONE;
 							readCommandPending = false;
 							break;
-						case COMMAND_GET_EPO_IGNORE:
-							// EPO ignore flag is one data byte
+						case COMMAND_GET_EPO_IGNORE:			// EPO ignore flag yields one data byte
 							if (epoIgnored) {
 								SSP1BUF = COMMAND_VALUE_ON;
 							} else {
@@ -509,8 +524,7 @@ void isr_i2c(void) __interrupt 0 {
 							i2cCommand = COMMAND_NONE;
 							readCommandPending = false;
 							break;
-						case COMMAND_GET_DRIVE_FAULT:
-							// Drive fault flag is one data byte
+						case COMMAND_GET_DRIVE_FAULT:			// Fault flag yields one data byte
 							if (PORTAbits.RA2 == 1) {
 								SSP1BUF = COMMAND_VALUE_OFF;
 							} else {
@@ -519,8 +533,7 @@ void isr_i2c(void) __interrupt 0 {
 							i2cCommand = COMMAND_NONE;
 							readCommandPending = false;
 							break;
-						case COMMAND_GET_FAILSAFE:
-							// Failsafe flag is one data byte
+						case COMMAND_GET_FAILSAFE:				// Failsafe flag yields one data byte
 							if (T4CONbits.TMR4ON == 0) {
 								SSP1BUF = COMMAND_VALUE_OFF;
 							} else {
@@ -529,8 +542,7 @@ void isr_i2c(void) __interrupt 0 {
 							i2cCommand = COMMAND_NONE;
 							readCommandPending = false;
 							break;
-						case COMMAND_GET_ENC_MODE:
-							// Encoder mode flag is one data byte
+						case COMMAND_GET_ENC_MODE:				// Encoder mode flag yields one data byte
 							if (encMode) {
 								SSP1BUF = COMMAND_VALUE_ON;
 							} else {
@@ -539,8 +551,7 @@ void isr_i2c(void) __interrupt 0 {
 							i2cCommand = COMMAND_NONE;
 							readCommandPending = false;
 							break;
-						case COMMAND_GET_ENC_MOVING:
-							// Encoder moving flag is one data byte
+						case COMMAND_GET_ENC_MOVING:			// Encoder moving flag yields one data byte
 							if (movingA || movingB) {
 								SSP1BUF = COMMAND_VALUE_ON;
 							} else {
@@ -549,31 +560,28 @@ void isr_i2c(void) __interrupt 0 {
 							i2cCommand = COMMAND_NONE;
 							readCommandPending = false;
 							break;
-						case COMMAND_GET_ENC_SPEED:
-							// Encoder speed is one data byte
+						case COMMAND_GET_ENC_SPEED:				// Encoder speed yields one data byte
 							SSP1BUF = encLimit;
 							i2cCommand = COMMAND_NONE;
 							readCommandPending = false;
 							break;
-						case COMMAND_GET_ID:
-							// ID is one data byte
+						case COMMAND_GET_ID:					// I2C ID is one data byte
 							SSP1BUF = I2C_ID_PICOBORG_REV;
 							i2cCommand = COMMAND_NONE;
 							readCommandPending = false;
 							break;
 						default:
-							// No valid command given. Send empty reply.
-							SSP1BUF = I2C_DATA_NONE;
-							readCommandPending = false;
-							byteCount = 0;
+							// No valid command given
+							SSP1BUF = I2C_DATA_NONE;			// Send empty reply
+							readCommandPending = false;			// Reset GET_... command pending flag
+							byteCount = 0;						//	and byte counter
 							break;
 					}
-				} else {						// I2C master wants to send data
-					if (i2cCommand == COMMAND_NONE) {
-												// If i2cCommand not (yet) set,
-						i2cCommand = SSP1BUF;	// get it from the I2C master
+				} else {										// I2C master wants to send data
+					if (i2cCommand == COMMAND_NONE) {			// If i2cCommand not (yet) set,
+						i2cCommand = SSP1BUF;					//	get it from the I2C master
 
-						switch(i2cCommand) {	// For all GET_... commands...
+						switch(i2cCommand) {					// For all GET_... commands...
 							case COMMAND_GET_LED:
 							case COMMAND_GET_A:
 							case COMMAND_GET_B:
@@ -585,75 +593,97 @@ void isr_i2c(void) __interrupt 0 {
 							case COMMAND_GET_ENC_MOVING:
 							case COMMAND_GET_ENC_SPEED:
 							case COMMAND_GET_ID:
-												//	... set the readCommandPending flag
-								readCommandPending = true;
+								readCommandPending = true;		//	... set the readCommandPending
+																//	flag
+																// This way the data to send back
+																//	to the master survives a
+																//	I2C STOP/START or RE-START
+																//	sequence.
 								break;
-							default:
-												// For all other commands
-												//	clear the readCommandPending flag
-								readCommandPending = false;
+							default:							// For all other commands...
+								readCommandPending = false;		//	... clear the readCommandPending
+																//	flag
 								break;
 						}
 						
-					} else {
-						if (byteCount > I2C_MAX_LEN) {
-							byteCount = I2C_MAX_LEN;
+					} else {									// Master wants to send and i2cCommand
+																//	is already set.
+																//	-> Must be a SET_... command.
+						if (byteCount > I2C_MAX_LEN) {			// First, make sure byteCount does not
+							byteCount = I2C_MAX_LEN;			//	surpass the maximum.
 						}
 
 						switch(i2cCommand) {
-							case COMMAND_SET_LED:
-								if (byteCount == 0) {
-									i2cRXData[0] = SSP1BUF;
+							/* A SET_... command has been initiated by the master.
+							 *	Get the appropriate number of data byte(s) for the
+							 *	command from the master.
+							 * Once all necessary data has been received for a
+							 *	command, set the I/O pins and/or registers accordingly.
+							*/
+							case COMMAND_SET_LED:				// Setting the LED on/off
+																//	needs one data byte
+								if (byteCount == 0) {			// Handle only first byte
+									i2cRXData[0] = SSP1BUF;		// Get the byte from the master
 									if (i2cRXData[0] == COMMAND_VALUE_OFF) {
-										LATAbits.LATA4 = 1;		// LED Off
+										LATAbits.LATA4 = 1;		// Set LED off
 									} else {
-										LATAbits.LATA4 = 0;		// LED On
+										LATAbits.LATA4 = 0;		// Set LED on
 									}
-									i2cCommand = COMMAND_NONE;
+									i2cCommand = COMMAND_NONE;	// Reset I2C command
 								}
-								if (SSP1STATbits.BF) {
-									junk = SSP1BUF;
+								if (SSP1STATbits.BF) {			// If there is excess data
+																//	for byteCount > 0,
+									junk = SSP1BUF;				//	just clear the buffer
 								}
-								++byteCount;
-								break;
-							case COMMAND_SET_A_FWD:
+								++byteCount;					// Increase byteCount
+								break;							// Done with this cycle
+							case COMMAND_SET_A_FWD:				// Running motor A forward
+																//	needs one data byte
 								if (byteCount == 0) {
-									i2cRXData[0] = SSP1BUF;
+									i2cRXData[0] = SSP1BUF;		// Read 'speed' byte from
+																//	master and run motor A
+																//	forward at desired speed
 									SetMotorA(false, (int)i2cRXData[0]);
-									i2cCommand = COMMAND_NONE;
-								}
+									i2cCommand = COMMAND_NONE;	// Reset, clear buffer, ...
+								}								// (cf. COMMAND_SET_LED)
 								if (SSP1STATbits.BF) {
 									junk = SSP1BUF;
 								}
 								++byteCount;
 								break;
-							case COMMAND_SET_A_REV:
+							case COMMAND_SET_A_REV:				// Running motor A in reverse
+																//	needs one data byte
 								if (byteCount == 0) {
-									i2cRXData[0] = SSP1BUF;
+									i2cRXData[0] = SSP1BUF;		// Run motor A in reverse
+																//	at desired speed
 									SetMotorA(true, (int)i2cRXData[0]);
-									i2cCommand = COMMAND_NONE;
+									i2cCommand = COMMAND_NONE;	// Reset, clear buffer, ...
 								}
 								if (SSP1STATbits.BF) {
 									junk = SSP1BUF;
 								}
 								++byteCount;
 								break;
-							case COMMAND_SET_B_FWD:
+							case COMMAND_SET_B_FWD:				// Running motor B forward
+																//	needs one data byte
 								if (byteCount == 0) {
-									i2cRXData[0] = SSP1BUF;
+									i2cRXData[0] = SSP1BUF;		// Run motor B forward
+																//	at desired speed
 									SetMotorB(false, (int)i2cRXData[0]);
-									i2cCommand = COMMAND_NONE;
-								}
+									i2cCommand = COMMAND_NONE;	// Reset, clear buffer, ...
+								}	
 								if (SSP1STATbits.BF) {
 									junk = SSP1BUF;
 								}
 								++byteCount;
 								break;
-							case COMMAND_SET_B_REV:
+							case COMMAND_SET_B_REV:				// Running motor B in reverse
+																//	needs one data byte
 								if (byteCount == 0) {
-									i2cRXData[0] = SSP1BUF;
+									i2cRXData[0] = SSP1BUF;		// Run motor B in reverse
+																//	at desired speed
 									SetMotorB(true, (int)i2cRXData[0]);
-									i2cCommand = COMMAND_NONE;
+									i2cCommand = COMMAND_NONE;	// Reset, clear buffer, ...
 								}
 								if (SSP1STATbits.BF) {
 									junk = SSP1BUF;
@@ -666,7 +696,7 @@ void isr_i2c(void) __interrupt 0 {
 									LATAbits.LATA4 = 1;		// LED Off
 									movingA = false;
 									movingB = false;
-									i2cCommand = COMMAND_NONE;
+									i2cCommand = COMMAND_NONE;	// Reset, clear buffer, ...
 								}
 								if (SSP1STATbits.BF) {
 									junk = SSP1BUF;
@@ -676,7 +706,7 @@ void isr_i2c(void) __interrupt 0 {
 							case COMMAND_RESET_EPO:
 								if (byteCount == 0) {
 									epoTripped = false;
-									i2cCommand = COMMAND_NONE;
+									i2cCommand = COMMAND_NONE;	// Reset, clear buffer, ...
 								}
 								if (SSP1STATbits.BF) {
 									junk = SSP1BUF;
@@ -691,7 +721,7 @@ void isr_i2c(void) __interrupt 0 {
 									} else {
 										epoIgnored = true;
 									}
-									i2cCommand = COMMAND_NONE;
+									i2cCommand = COMMAND_NONE;	// Reset, clear buffer, ...
 								}
 								if (SSP1STATbits.BF) {
 									junk = SSP1BUF;
@@ -702,7 +732,7 @@ void isr_i2c(void) __interrupt 0 {
 								if (byteCount == 0) {
 									i2cRXData[0] = SSP1BUF;
 									SetAllMotors(false, (int)i2cRXData[0]);
-									i2cCommand = COMMAND_NONE;
+									i2cCommand = COMMAND_NONE;	// Reset, clear buffer, ...
 								}
 								if (SSP1STATbits.BF) {
 									junk = SSP1BUF;
@@ -713,7 +743,7 @@ void isr_i2c(void) __interrupt 0 {
 								if (byteCount == 0) {
 									i2cRXData[0] = SSP1BUF;
 									SetAllMotors(true, (int)i2cRXData[0]);
-									i2cCommand = COMMAND_NONE;
+									i2cCommand = COMMAND_NONE;	// Reset, clear buffer, ...
 								}
 								if (SSP1STATbits.BF) {
 									junk = SSP1BUF;
@@ -729,7 +759,7 @@ void isr_i2c(void) __interrupt 0 {
 										T4CONbits.TMR4ON = 1;			// Timer 4 enabled
 									}
 									PIR3bits.TMR4IF = 0;			// Clear Timer 4 interrupt flag
-									i2cCommand = COMMAND_NONE;
+									i2cCommand = COMMAND_NONE;	// Reset, clear buffer, ...
 								}
 								if (SSP1STATbits.BF) {
 									junk = SSP1BUF;
@@ -744,7 +774,7 @@ void isr_i2c(void) __interrupt 0 {
 									} else {
 										SetEncoderMode(true);
 									}
-									i2cCommand = COMMAND_NONE;
+									i2cCommand = COMMAND_NONE;	// Reset, clear buffer, ...
 								}
 								if (SSP1STATbits.BF) {
 									junk = SSP1BUF;
@@ -834,7 +864,7 @@ void isr_i2c(void) __interrupt 0 {
 							case COMMAND_SET_ENC_SPEED:
 								if (byteCount == 0) {
 									encLimit = SSP1BUF;
-									i2cCommand = COMMAND_NONE;
+									i2cCommand = COMMAND_NONE;	// Reset, clear buffer, ...
 								}
 								if (SSP1STATbits.BF) {
 									junk = SSP1BUF;
@@ -845,16 +875,15 @@ void isr_i2c(void) __interrupt 0 {
 								if (byteCount == 0) {
 									i2cRXData[0] = SSP1BUF;
 									if ((i2cRXData[0] < 0x03) || (i2cRXData[0] > 0x77)) {
-										// New address is from reserved
-										// address space. Ignore it.
-										i2cCommand = COMMAND_NONE;
+										/* New address is from reserved
+										 * address space. Ignore it.
+										 */
+										i2cCommand = COMMAND_NONE;	// Reset, clear buffer, ...
 										++byteCount;
 										break;
 									}
-									// Set the live I2C address
-									SSP1ADD = i2cRXData[0] << 1;
-									// Save the I2C address to EEPROM
-									PIR2bits.EEIF = 0;
+									SSP1ADD = i2cRXData[0] << 1;	// Set the live I2C address
+									PIR2bits.EEIF = 0;				// Save the I2C address to EEPROM
 									EECON1bits.WREN = 1;
 									EEADRL = EEPROM_I2C_ADDRESS;
 									EEDATL = i2cRXData[0];
@@ -864,15 +893,15 @@ void isr_i2c(void) __interrupt 0 {
 									while (PIR2bits.EEIF == 0);
 									PIR2bits.EEIF = 0;
 									EECON1bits.WREN = 0;
-									i2cCommand = COMMAND_NONE;
+									i2cCommand = COMMAND_NONE;		// Reset, clear buffer, ...
 								}
 								if (SSP1STATbits.BF) {
 									junk = SSP1BUF;
 								}
 								++byteCount;
 								break;
-							default:
-								if (SSP1STATbits.BF) {
+							default:								// No valid command received
+								if (SSP1STATbits.BF) {				// Just clear the buffer
 									junk = SSP1BUF;
 								}
 								break;
