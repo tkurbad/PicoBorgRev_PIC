@@ -38,3 +38,14 @@ make
 ```
 make upload
 ```
+
+## Acknowledgements
+
+I want to thank the nice people at http://www.piborg.org for their well
+written and nicely documented code. Those qualities made it very easy to
+port the project to the `sdcc` and fix the problems I was having with the
+motor controller.
+
+## License
+
+*TBD*
