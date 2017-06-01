@@ -101,8 +101,6 @@ extern bool epoTripped;
 extern bool epoIgnored;
 // Communications failsafe counter
 extern int failsafeCounter;
-// Is encoder mode active?
-extern bool encMode;
 // Is motor A moving?
 extern bool movingA;
 // Is motor B moving?

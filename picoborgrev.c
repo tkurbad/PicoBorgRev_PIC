@@ -99,8 +99,6 @@ bool epoTripped = false;
 bool epoIgnored = false;
 // Communications failsafe counter
 int failsafeCounter = 0;
-// Is encoder mode active?
-bool encMode = false;
 // Is motor A moving?
 bool movingA = false;
 // Is motor B moving?
@@ -307,7 +305,6 @@ void SetAllMotors(bool reverse, int pwm) {
 /* Enable/disable encoder mode */
 void SetEncoderMode(bool enabled) {
 	// Disable any automatic routines
-	encMode = false;
 	movingA = false;
 	movingB = false;
 
@@ -315,8 +312,7 @@ void SetEncoderMode(bool enabled) {
 	SetAllMotors(false, 0);
 
 	// Set the correct mode
-	encMode = enabled;
-	if (encMode == true) {
+	if (enabled == true) {
 		INTCONbits.IOCIE = 1;				// Interrupts on change enabled
 	} else {
 		INTCONbits.IOCIE = 0;				// Interrupts on change disabled
@@ -326,7 +322,7 @@ void SetEncoderMode(bool enabled) {
 /* Move motor A by 'count' encoder ticks */
 void MoveMotorA(bool reverse, int count) {
 	// Make sure we are in encoder mode before starting
-	if (encMode == false) {
+	if (INTCONbits.IOCIE == 0) {
 		return;
 	}
 
@@ -343,7 +339,7 @@ void MoveMotorA(bool reverse, int count) {
 /* Move motor A by 'count' encoder ticks */
 void MoveMotorB(bool reverse, int count) {
 	// Make sure we are in encoder mode before starting
-	if (encMode == false) {
+	if (INTCONbits.IOCIE == 0) {
 		return;
 	}
 
@@ -364,6 +360,20 @@ void MoveMotorB(bool reverse, int count) {
 
 /* ISR to process the I2C commands and encoder interrupts */
 void isr_i2c(void) __interrupt 0 {
+
+	/* Encoder interrupt processing */
+
+	if (INTCONbits.IOCIF) {					// Pin change event occured?
+		INTCONbits.IOCIF = 0;				// Clear the pin change interrupt
+		if (IOCAFbits.IOCAF0) {				// Encoder for motor B moved one tick
+			IOCAFbits.IOCAF0 = 0;			// Clear the encoder interrupt
+			--remainingCountsB;				// Reduce remaining ticks for motor B
+		}
+		if (IOCAFbits.IOCAF1) {				// Encoder for motor A moved one tick
+			IOCAFbits.IOCAF1 = 0;			// Clear the encoder interrupt
+			--remainingCountsA;				// Reduce remaining ticks for motor A
+		}
+	}
 
 	/* I2C interrupt processing */
 
@@ -507,7 +517,7 @@ void isr_i2c(void) __interrupt 0 {
 							}
 							break;
 						case COMMAND_GET_EPO:					// EPO tripped flag yields one data byte
-							if (epoTripped) {
+							if (epoTripped == true) {
 								SSP1BUF = COMMAND_VALUE_ON;
 							} else {
 								SSP1BUF = COMMAND_VALUE_OFF;
@@ -516,7 +526,7 @@ void isr_i2c(void) __interrupt 0 {
 							readCommandPending = false;
 							break;
 						case COMMAND_GET_EPO_IGNORE:			// EPO ignore flag yields one data byte
-							if (epoIgnored) {
+							if (epoIgnored == true) {
 								SSP1BUF = COMMAND_VALUE_ON;
 							} else {
 								SSP1BUF = COMMAND_VALUE_OFF;
@@ -543,7 +553,7 @@ void isr_i2c(void) __interrupt 0 {
 							readCommandPending = false;
 							break;
 						case COMMAND_GET_ENC_MODE:				// Encoder mode flag yields one data byte
-							if (encMode) {
+							if (INTCONbits.IOCIE == 1) {
 								SSP1BUF = COMMAND_VALUE_ON;
 							} else {
 								SSP1BUF = COMMAND_VALUE_OFF;
@@ -552,7 +562,7 @@ void isr_i2c(void) __interrupt 0 {
 							readCommandPending = false;
 							break;
 						case COMMAND_GET_ENC_MOVING:			// Encoder moving flag yields one data byte
-							if (movingA || movingB) {
+							if ((movingA == true) || (movingB == true)) {
 								SSP1BUF = COMMAND_VALUE_ON;
 							} else {
 								SSP1BUF = COMMAND_VALUE_OFF;
@@ -979,20 +989,6 @@ void isr_i2c(void) __interrupt 0 {
 		SSP1CON1bits.CKP = 1;				// Release clock line
 											//	(clock stretching ends)
 	}
-
-	/* Encoder interrupt processing */
-
-	if (INTCONbits.IOCIF) {					// Pin change event occured?
-		INTCONbits.IOCIF = 0;				// Clear the pin change interrupt
-		if (IOCAFbits.IOCAF0) {				// Encoder for motor B moved one tick
-			IOCAFbits.IOCAF0 = 0;			// Clear the encoder interrupt
-			--remainingCountsB;				// Reduce remaining ticks for motor B
-		}
-		if (IOCAFbits.IOCAF1) {				// Encoder for motor A moved one tick
-			IOCAFbits.IOCAF1 = 0;			// Clear the encoder interrupt
-			--remainingCountsA;				// Reduce remaining ticks for motor A
-		}
-	}
 }
 
 
@@ -1046,7 +1042,7 @@ void main(void) {
 		}
 
 		// Run the encoder loop
-		if (encMode == true) {			// If encoder mode is enabled
+		if (INTCONbits.IOCIE == 1) {			// If encoder mode is enabled
 			if (movingA && (remainingCountsA <= 0)) {
 				SetMotorA(false, 0);	// Stop motor A if encoder ticks count reached
 				movingA = false;
