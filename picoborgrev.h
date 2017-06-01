@@ -18,8 +18,8 @@ typedef enum { false, true } bool;
 /********************************************************************************/
 
 #define SYS_FREQ				32000000L
-#define INSTR_PER_MS			(SYS_FREQ / 2000L)
-#define LOOPS_PER_MS			(INSTR_PER_MS / 14U)	// For delay loop
+#define INSTR_PER_MS			(SYS_FREQ / 8000L)
+#define LOOPS_PER_MS			(INSTR_PER_MS / 10U)	// For delay loop
 
 /********************************************************************************/
 /* User Level #define Macros													*/

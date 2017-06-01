@@ -59,10 +59,8 @@ __code unsigned short __at (_CONFIG2) configWord2 = (
 
 /* Configure the PIC's internal oswillator */
 void ConfigureOscillator(void) {
-	OSCCONbits.SCS = 0b0;		// Set the clock to the CONFIG1 setting (internal oscillator)
+	OSCCONbits.SCS = 0b00;			// Set the clock to the CONFIG1 setting (internal oscillator)
 	OSCCONbits.IRCF = 0b1110;	// Select the 8 MHz postscaler
-	OSCCONbits.SPLLEN = 1;		// Enable the 4x PLL (overriden in CONFIG2 by PLLEN = ON)
-	OSCTUNEbits.TUN = 0b011111;	// Set oscillator to max frequency
 }
 
 /* Delay processing for approximately 'ms' milliseconds */
@@ -372,6 +370,22 @@ void MoveMotorB(bool reverse, int count) {
 
 /* ISR to process the I2C commands and encoder interrupts */
 void isr_i2c(void) __interrupt 0 {
+
+	/* Encoder interrupt processing */
+
+	if (INTCONbits.IOCIF) {					// Pin change event occured?
+		INTCONbits.IOCIF = 0;				// Clear the pin change interrupt
+		if (IOCAFbits.IOCAF0) {				// Encoder for motor B moved one tick
+			IOCAFbits.IOCAF0 = 0;			// Clear the encoder interrupt
+			--remainingCountsB;				// Reduce remaining ticks for motor B
+		}
+		if (IOCAFbits.IOCAF1) {				// Encoder for motor A moved one tick
+			IOCAFbits.IOCAF1 = 0;			// Clear the encoder interrupt
+			--remainingCountsA;				// Reduce remaining ticks for motor A
+		}
+		return;								// Do not service other interrupts in
+											// this round
+	}
 
 	/* I2C interrupt processing */
 
@@ -993,20 +1007,6 @@ void isr_i2c(void) __interrupt 0 {
 		SSP1CON1bits.CKP = 1;				// Release clock line
 											//	(clock stretching ends)
 	}
-
-	/* Encoder interrupt processing */
-
-	if (INTCONbits.IOCIF) {					// Pin change event occured?
-		INTCONbits.IOCIF = 0;				// Clear the pin change interrupt
-		if (IOCAFbits.IOCAF0) {				// Encoder for motor B moved one tick
-			IOCAFbits.IOCAF0 = 0;			// Clear the encoder interrupt
-			--remainingCountsB;				// Reduce remaining ticks for motor B
-		}
-		if (IOCAFbits.IOCAF1) {				// Encoder for motor A moved one tick
-			IOCAFbits.IOCAF1 = 0;			// Clear the encoder interrupt
-			--remainingCountsA;				// Reduce remaining ticks for motor A
-		}
-	}
 }
 
 
@@ -1060,7 +1060,7 @@ void main(void) {
 		}
 
 		// Run the encoder loop
-		if (INTCONbits.IOCIE == 1) {			// If encoder mode is enabled
+		if (INTCONbits.IOCIE == 1) {	// If encoder mode is enabled
 			if (movingA && (remainingCountsA <= 0)) {
 				SetMotorA(false, 0);	// Stop motor A if encoder ticks count reached
 				movingA = false;
@@ -1083,6 +1083,6 @@ void main(void) {
 		}
 
 		// Kick the watchdog
-		ClrWdt();
+		//ClrWdt();
 	}
 }
