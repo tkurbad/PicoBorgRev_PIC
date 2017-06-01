@@ -361,20 +361,6 @@ void MoveMotorB(bool reverse, int count) {
 /* ISR to process the I2C commands and encoder interrupts */
 void isr_i2c(void) __interrupt 0 {
 
-	/* Encoder interrupt processing */
-
-	if (INTCONbits.IOCIF) {					// Pin change event occured?
-		INTCONbits.IOCIF = 0;				// Clear the pin change interrupt
-		if (IOCAFbits.IOCAF0) {				// Encoder for motor B moved one tick
-			IOCAFbits.IOCAF0 = 0;			// Clear the encoder interrupt
-			--remainingCountsB;				// Reduce remaining ticks for motor B
-		}
-		if (IOCAFbits.IOCAF1) {				// Encoder for motor A moved one tick
-			IOCAFbits.IOCAF1 = 0;			// Clear the encoder interrupt
-			--remainingCountsA;				// Reduce remaining ticks for motor A
-		}
-	}
-
 	/* I2C interrupt processing */
 
 	if (PIR1bits.SSP1IF) {						// I2C event occured?
@@ -988,6 +974,20 @@ void isr_i2c(void) __interrupt 0 {
 		}
 		SSP1CON1bits.CKP = 1;				// Release clock line
 											//	(clock stretching ends)
+	}
+
+	/* Encoder interrupt processing */
+
+	if (INTCONbits.IOCIF) {					// Pin change event occured?
+		INTCONbits.IOCIF = 0;				// Clear the pin change interrupt
+		if (IOCAFbits.IOCAF0) {				// Encoder for motor B moved one tick
+			IOCAFbits.IOCAF0 = 0;			// Clear the encoder interrupt
+			--remainingCountsB;				// Reduce remaining ticks for motor B
+		}
+		if (IOCAFbits.IOCAF1) {				// Encoder for motor A moved one tick
+			IOCAFbits.IOCAF1 = 0;			// Clear the encoder interrupt
+			--remainingCountsA;				// Reduce remaining ticks for motor A
+		}
 	}
 }
 
