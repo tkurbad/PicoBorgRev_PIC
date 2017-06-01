@@ -105,6 +105,10 @@ extern int failsafeCounter;
 extern bool movingA;
 // Is motor B moving?
 extern bool movingB;
+// Motor A moving in reverse?
+extern bool reverseA;
+// Motor B moving in reverse?
+extern bool reverseB;
 // Maximum PWM duty cycle for encoder mode
 extern int encLimit;
 // Remaining encoder ticks for motor A

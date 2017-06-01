@@ -103,8 +103,12 @@ int failsafeCounter = 0;
 bool movingA = false;
 // Is motor B moving?
 bool movingB = false;
-// Maximum PWM duty cycle for encoder mode
-int encLimit = 255;
+// Motor A moving in reverse?
+bool reverseA = false;
+// Motor B moving in reverse?
+bool reverseB = false;
+// Set PWM duty cycle for encoder mode to PWM_MAX
+int encLimit = PWM_MAX;
 // Remaining encoder ticks for motor A
 int remainingCountsA = 0;
 // Remaining encoder ticks for motor B
@@ -243,9 +247,11 @@ void SetMotorA(bool reverse, int pwm) {
 	// Work out the required settings
 	if (pwm > PWM_MAX) pwm = PWM_MAX;
 	if (reverse == true) {
+		reverseA = true;				// Motor A is moving in reverse
 		pwm = PWM_MAX - pwm;			// PWM pulse width inverted for reverse
 		LATCbits.LATC2 = 1;				// Motor A:2 On
 	} else {
+		reverseA = false;				// Motor A is moving forward
 		// PWM pulse width is not inverted for forward
 		LATCbits.LATC2 = 0;				// Motor A:2 Off
 	}
@@ -265,9 +271,11 @@ void SetMotorB(bool reverse, int pwm) {
 	// Work out the required settings
 	if (pwm > PWM_MAX) pwm = PWM_MAX;
 	if (reverse == true) {
+		reverseB = true;				// Motor B is moving in reverse
 		pwm = PWM_MAX - pwm;			// PWM pulse width inverted for reverse
 		LATCbits.LATC4 = 1;				// Motor B:2 On
 	} else {
+		reverseB = false;				// Motor B is moving forward
 		// PWM pulse width is not inverted for forward
 		LATCbits.LATC4 = 0;				// Motor B:2 Off
 	}
@@ -286,9 +294,13 @@ void SetAllMotors(bool reverse, int pwm) {
 	// Work out the required settings
 	if (pwm > PWM_MAX) pwm = PWM_MAX;
 	if (reverse == true) {
+		reverseA = true;					// Motor A is moving in reverse
+		reverseB = true;					// Motor B is moving in reverse
 		pwm = PWM_MAX - pwm;				// PWM pulse width inverted for reverse
 		LATC = PORTC | (_LATC2 | _LATC4);	// Motor A:2 and B:2 On
 	} else {
+		reverseA = false;					// Motor A is moving forward
+		reverseB = false;					// Motor B is moving forward
 		// PWM pulse width is not inverted for forward
 		LATC = PORTC & ~(_LATC2 | _LATC4);	// Motor A:2 and B:2 Off
 	}
@@ -925,6 +937,12 @@ void isr_i2c(void) __interrupt 0 {
 																//	needs one data byte
 								if (byteCount == 0) {
 									encLimit = SSP1BUF;			// Set encoder speed
+									if ((movingA == true) && (remainingCountsA > 0)) {
+										SetMotorA(reverseA, encLimit);
+									}
+									if ((movingB == true) && (remainingCountsB > 0)) {
+										SetMotorB(reverseB, encLimit);
+									}
 									i2cCommand = COMMAND_NONE;	// Reset, clear buffer, ...
 								}
 								if (SSP1STATbits.BF) {
